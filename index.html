@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=1024, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
   <title>Invoice Generator</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -19,12 +20,11 @@
     .invoice-page {
       width: 100%;
       max-width: 794px;
+      min-width: 320px;
       margin: 15mm auto;
       background: white;
       padding: 15mm;
       border: 1px solid #000;
-      position: relative;
-      min-height: 267mm; /* A4 height (297mm) - 15mm padding on top and bottom */
     }
     @media print {
       body * {
@@ -45,6 +45,15 @@
       }
       .download-btn, #preview-btn, #print-btn, form {
         display: none;
+      }
+    }
+    @media screen and (max-width: 768px) {
+      .invoice-page, form {
+        padding: 10mm;
+        font-size: 14px;
+      }
+      table {
+        font-size: 9px;
       }
     }
     .header {
@@ -104,7 +113,9 @@
       margin-top: 5px;
     }
     form {
+      width: 100%;
       max-width: 794px;
+      min-width: 320px;
       margin: 20px auto;
       padding: 20px;
       background: #fff;
@@ -125,7 +136,16 @@
       padding: 10px;
       border: 1px solid #ddd;
     }
-    .remove-item {
+    .sub-items-container {
+      margin-top: 10px;
+      padding-left: 20px;
+    }
+    .sub-item {
+      margin-bottom: 10px;
+      padding: 5px;
+      border: 1px solid #eee;
+    }
+    .remove-item, .remove-sub-item {
       margin-top: 10px;
       padding: 5px;
       background: #ff4d4d;
@@ -133,19 +153,13 @@
       border: none;
       cursor: pointer;
     }
-    .footer {
-      position: absolute;
-      bottom: 15mm; /* Match padding of invoice-page */
-      left: 15mm;
-      right: 15mm;
-      text-align: center;
-      font-size: 10px;
-      line-height: 1.2;
-    }
-    .footer img {
-      width: 100%;
-      max-width: 400px;
-      margin-bottom: 5px;
+    .add-sub-item {
+      margin-top: 5px;
+      padding: 5px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      cursor: pointer;
     }
   </style>
 </head>
@@ -174,13 +188,22 @@
           <label>SAC Code:</label><input type="text" name="sac-code[]">
           <label>Tax Type:</label><input type="text" name="tax-type[]">
           <label>Taxable Value:</label><input type="number" name="taxable-value[]" step="0.01">
-          <label>SGST %   %:</label><input type="number" name="sgst-rate[]" step="0.01">
+          <label>SGST %:</label><input type="number" name="sgst-rate[]" step="0.01">
           <label>CGST %:</label><input type="number" name="cgst-rate[]" step="0.01">
           <label>IGST %:</label><input type="number" name="igst-rate[]" step="0.01">
-          <button type="button" class="remove-item">Remove</button>
+          <div class="sub-items-container">
+            <h4>Sub-Services (Optional)</h4>
+            <div class="sub-item">
+              <label>Sub-Service Description:</label><textarea name="sub-description[]"></textarea>
+              <label>Sub-Service Taxable Value:</label><input type="number" name="sub-taxable-value[]" step="0.01">
+              <button type="button" class="remove-sub-item">Remove Sub-Service</button>
+            </div>
+          </div>
+          <button type="button" class="add-sub-item">Add Sub-Service</button>
+          <button type="button" class="remove-item">Remove Service</button>
         </div>
       </div>
-      <button type="button" id="add-item">Add Another Item</button>
+      <button type="button" id="add-item">Add Another Service</button>
       <button type="button" id="preview-btn">Preview Invoice</button>
     </form>
   </div>
@@ -202,14 +225,10 @@
         </div>
       </div>
       <div style="text-align: right;">
-        <img src="image.png" class="logo" alt="Tripzetta Logo">
+        <img src="https://via.placeholder.com/150x40?text=Logo" class="logo" alt="Tripzetta Logo">
         <div class="right-info">
           <p><strong>GSTIN :</strong> 07APDPA8620A1ZL</p>
           <p><strong>PAN :</strong> APDPA8620A</p>
-          <p><strong>Regd. Address :</strong></p>
-          <p>408 4th Floor Devika Tower</p>
-          <p>Nehru Place New Delhi</p>
-          <p><strong>Contact:</strong> +919650485130</p>
         </div>
       </div>
     </div>
@@ -271,15 +290,18 @@
         <p>Authorised Signatory</p>
       </div>
     </div>
-    <div class="footer">
-      <p>408, 4th Floor, Devika Tower, Nehru Place, New Delhi-110019</p>
-      <p>Ph.: 011 41032067, +91 9650485130 | sales@tripzetta.com, www.tripzetta.com</p>
-    </div>
   </div>
   <button id="download-btn" class="download-btn">Download Invoice PDF</button>
   <button id="print-btn" class="download-btn">Print Invoice</button>
 
   <script>
+    // Enforce desktop viewport on mobile devices
+    window.addEventListener('load', function() {
+      if (/Mobi|Android/i.test(navigator.userAgent)) {
+        document.querySelector('meta[name="viewport"]').setAttribute('content', 'width=1024, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+      }
+    });
+
     function numberToWords(num) {
       if (num === 0) return 'Zero Rupees Only';
 
@@ -328,6 +350,14 @@
       const itemsContainer = document.getElementById('items-container');
       const newItem = itemsContainer.firstElementChild.cloneNode(true);
       newItem.querySelectorAll('input, textarea').forEach(input => input.value = '');
+      newItem.querySelector('.sub-items-container').innerHTML = `
+        <h4>Sub-Services (Optional)</h4>
+        <div class="sub-item">
+          <label>Sub-Service Description:</label><textarea name="sub-description[]"></textarea>
+          <label>Sub-Service Taxable Value:</label><input type="number" name="sub-taxable-value[]" step="0.01">
+          <button type="button" class="remove-sub-item">Remove Sub-Service</button>
+        </div>
+      `;
       itemsContainer.appendChild(newItem);
     });
 
@@ -340,13 +370,25 @@
         } else {
           alert('At least one item is required.');
         }
+      } else if (e.target.classList.contains('add-sub-item')) {
+        const subItemsContainer = e.target.previousElementSibling;
+        const newSubItem = subItemsContainer.querySelector('.sub-item').cloneNode(true);
+        newSubItem.querySelectorAll('input, textarea').forEach(input => input.value = '');
+        subItemsContainer.appendChild(newSubItem);
+      } else if (e.target.classList.contains('remove-sub-item')) {
+        const subItem = e.target.closest('.sub-item');
+        const subItems = subItem.parentElement.querySelectorAll('.sub-item');
+        if (subItems.length > 1) {
+          subItem.remove();
+        } else {
+          alert('At least one sub-service is required if you add sub-services.');
+        }
       }
     });
 
     document.getElementById('preview-btn').addEventListener('click', function () {
       const form = document.getElementById('invoice-form');
 
-      // Fill invoice header info
       document.getElementById('invoice-date').innerText = form['invoice-date'].value || '';
       document.getElementById('invoice-no').innerText = form['invoice-no'].value || '';
       document.getElementById('place-of-supply').innerText = form['place-of-supply'].value || '';
@@ -355,17 +397,14 @@
       document.getElementById('customer-gstin').innerText = form['customer-gstin'].value || '';
       document.getElementById('customer-state').innerText = form['customer-state'].value || '';
 
-      // Clear existing table rows
       const tbody = document.getElementById('invoice-table-body');
       tbody.innerHTML = '';
 
-      // Variables for totals
       let totalBeforeTax = 0;
       let totalSGST = 0;
       let totalCGST = 0;
       let totalIGST = 0;
 
-      // Process item entries
       const items = document.querySelectorAll('#items-container .item');
       items.forEach((item, index) => {
         const description = item.querySelector('[name="description[]"]').value || '';
@@ -376,10 +415,10 @@
         const cgstRate = parseFloat(item.querySelector('[name="cgst-rate[]"]').value) || 0;
         const igstRate = parseFloat(item.querySelector('[name="igst-rate[]"]').value) || 0;
 
-        const sgstAmt = taxableValue * sgstRate / 100 || 0;
-        const cgstAmt = taxableValue * cgstRate / 100 || 0;
-        const igstAmt = taxableValue * igstRate / 100 || 0;
-        const total = taxableValue + sgstAmt + cgstAmt + igstAmt;
+        let sgstAmt = taxableValue * sgstRate / 100 || 0;
+        let cgstAmt = taxableValue * cgstRate / 100 || 0;
+        let igstAmt = taxableValue * igstRate / 100 || 0;
+        let total = taxableValue + sgstAmt + cgstAmt + igstAmt;
 
         totalBeforeTax += taxableValue;
         totalSGST += sgstAmt;
@@ -402,9 +441,43 @@
           <td>${total.toFixed(2)}</td>
         `;
         tbody.appendChild(row);
+
+        const subItems = item.querySelectorAll('.sub-item');
+        subItems.forEach((subItem) => {
+          const subDescription = subItem.querySelector('[name="sub-description[]"]').value || '';
+          const subTaxableValue = parseFloat(subItem.querySelector('[name="sub-taxable-value[]"]').value) || 0;
+
+          if (subDescription || subTaxableValue) {
+            sgstAmt = subTaxableValue * sgstRate / 100 || 0;
+            cgstAmt = subTaxableValue * cgstRate / 100 || 0;
+            igstAmt = subTaxableValue * igstRate / 100 || 0;
+            total = subTaxableValue + sgstAmt + cgstAmt + igstAmt;
+
+            totalBeforeTax += subTaxableValue;
+            totalSGST += sgstAmt;
+            totalCGST += cgstAmt;
+            totalIGST += igstAmt;
+
+            const subRow = document.createElement('tr');
+            subRow.innerHTML = `
+              <td></td>
+              <td>${subDescription.replace(/\n/g, '<br>')}</td>
+              <td></td>
+              <td></td>
+              <td>${subTaxableValue.toFixed(2)}</td>
+              <td>${sgstRate.toFixed(2)}</td>
+              <td>${sgstAmt.toFixed(2)}</td>
+              <td>${cgstRate.toFixed(2)}</td>
+              <td>${cgstAmt.toFixed(2)}</td>
+              <td>${igstRate.toFixed(2)}</td>
+              <td>${igstAmt.toFixed(2)}</td>
+              <td>${total.toFixed(2)}</td>
+            `;
+            tbody.appendChild(subRow);
+          }
+        });
       });
 
-      // Add total row
       const totalRow = document.createElement('tr');
       totalRow.innerHTML = `
         <td colspan="11" style="text-align:right;font-weight:bold;">Total Invoice Value</td>
@@ -416,7 +489,6 @@
       const roundedTotal = Math.round(grossTotal);
       const rounding = roundedTotal - grossTotal;
 
-      // Update total summary
       document.getElementById('total-before-tax').innerText = totalBeforeTax.toFixed(2);
       document.getElementById('sgst-amount').innerText = totalSGST.toFixed(2);
       document.getElementById('cgst-amount').innerText = totalCGST.toFixed(2);
