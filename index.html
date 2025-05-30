@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Invoice Generator</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
+    }
+    .invoice-page {
+      width: 100%;
+      max-width: 794px;
+      margin: 15mm auto;
+      background: white;
+      padding: 15mm;
+      border: 1px solid #000;
+      position: relative;
+      min-height: 267mm; /* A4 height (297mm) - 15mm padding on top and bottom */
+    }
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      #invoice, #invoice * {
+        visibility: visible;
+      }
+      .invoice-page {
+        position: absolute;
+        top: 0;
+        left: 0;
+        margin: 0;
+        padding: 15mm;
+        width: 210mm;
+        height: 297mm;
+        box-shadow: none;
+      }
+      .download-btn, #preview-btn, #print-btn, form {
+        display: none;
+      }
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+    .logo {
+      height: 40px;
+    }
+    .title {
+      font-size: 20px;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+    .section {
+      font-size: 12px;
+      margin-bottom: 10px;
+    }
+    .bold {
+      font-weight: bold;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 10px;
+    }
+    th, td {
+      border: 1px solid #000;
+      padding: 4px;
+      text-align: left;
+    }
+    .bank-section {
+      width: 100%;
+      display: flex;
+      flex-direction: row;
+      flex-wrap: wrap;
+      font-size: 10px;
+      margin-top: 15px;
+    }
+    .terms, .signature {
+      font-size: 10px;
+    }
+    .download-btn, #preview-btn, #print-btn {
+      display: block;
+      width: 90%;
+      max-width: 300px;
+      margin: 10px auto;
+      padding: 10px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .right-info {
+      font-size: 10px;
+      text-align: right;
+      margin-top: 5px;
+    }
+    form {
+      max-width: 794px;
+      margin: 20px auto;
+      padding: 20px;
+      background: #fff;
+      border: 1px solid #ccc;
+    }
+    label {
+      display: block;
+      margin: 10px 0 5px;
+    }
+    input, textarea {
+      width: 100%;
+      max-width: 400px;
+      padding: 5px;
+      margin-bottom: 10px;
+    }
+    #items-container .item {
+      margin-bottom: 20px;
+      padding: 10px;
+      border: 1px solid #ddd;
+    }
+    .remove-item {
+      margin-top: 10px;
+      padding: 5px;
+      background: #ff4d4d;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    .footer {
+      position: absolute;
+      bottom: 15mm; /* Match padding of invoice-page */
+      left: 15mm;
+      right: 15mm;
+      text-align: center;
+      font-size: 10px;
+      line-height: 1.2;
+    }
+    .footer img {
+      width: 100%;
+      max-width: 400px;
+      margin-bottom: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div>
+    <h2>Enter Invoice Details</h2>
+    <form id="invoice-form">
+      <label for="form-invoice-date">Invoice Date:</label>
+      <input type="date" id="form-invoice-date" name="invoice-date">
+      <label for="form-invoice-no">Invoice No:</label>
+      <input type="text" id="form-invoice-no" name="invoice-no">
+      <label for="form-place-of-supply">Place of Supply:</label>
+      <input type="text" id="form-place-of-supply" name="place-of-supply">
+      <label for="form-customer-name">Customer's Name:</label>
+      <input type="text" id="form-customer-name" name="customer-name">
+      <label for="form-customer-address">Customer's Address:</label>
+      <textarea id="form-customer-address" name="customer-address"></textarea>
+      <label for="form-customer-gstin">Customer's GSTIN:</label>
+      <input type="text" id="form-customer-gstin" name="customer-gstin">
+      <label for="form-customer-state">Customer's STATE:</label>
+      <input type="text" id="form-customer-state" name="customer-state">
+      <h3>Items</h3>
+      <div id="items-container">
+        <div class="item">
+          <label>Service Description:</label><textarea name="description[]"></textarea>
+          <label>SAC Code:</label><input type="text" name="sac-code[]">
+          <label>Tax Type:</label><input type="text" name="tax-type[]">
+          <label>Taxable Value:</label><input type="number" name="taxable-value[]" step="0.01">
+          <label>SGST %   %:</label><input type="number" name="sgst-rate[]" step="0.01">
+          <label>CGST %:</label><input type="number" name="cgst-rate[]" step="0.01">
+          <label>IGST %:</label><input type="number" name="igst-rate[]" step="0.01">
+          <button type="button" class="remove-item">Remove</button>
+        </div>
+      </div>
+      <button type="button" id="add-item">Add Another Item</button>
+      <button type="button" id="preview-btn">Preview Invoice</button>
+    </form>
+  </div>
+
+  <div class="invoice-page" id="invoice">
+    <div class="header">
+      <div>
+        <p class="title">TAX INVOICE</p>
+        <div class="section">
+          <p><span class="bold">Invoice Date :</span> <span id="invoice-date"></span></p>
+          <p><span class="bold">Invoice No :</span> <span id="invoice-no"></span></p>
+          <p><span class="bold">Place of Supply :</span> <span id="place-of-supply"></span></p>
+        </div>
+        <div class="section">
+          <p><span class="bold">Name :</span> <span id="customer-name"></span></p>
+          <p><span class="bold">Address :</span> <span id="customer-address"></span></p>
+          <p><span class="bold">GSTIN :</span> <span id="customer-gstin"></span></p>
+          <p><span class="bold">STATE :</span> <span id="customer-state"></span></p>
+        </div>
+      </div>
+      <div style="text-align: right;">
+        <img src="image.png" class="logo" alt="Tripzetta Logo">
+        <div class="right-info">
+          <p><strong>GSTIN :</strong> 07APDPA8620A1ZL</p>
+          <p><strong>PAN :</strong> APDPA8620A</p>
+          <p><strong>Regd. Address :</strong></p>
+          <p>408 4th Floor Devika Tower</p>
+          <p>Nehru Place New Delhi</p>
+          <p><strong>Contact:</strong> +919650485130</p>
+        </div>
+      </div>
+    </div>
+    <table id="invoice-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Service Description</th>
+          <th>SAC Code</th>
+          <th>Tax Type</th>
+          <th>Taxable Value</th>
+          <th>SGST %</th>
+          <th>SGST Amount</th>
+          <th>CGST %</th>
+          <th>CGST Amount</th>
+          <th>IGST %</th>
+          <th>IGST Amount</th>
+          <th>Total (INR)</th>
+        </tr>
+      </thead>
+      <tbody id="invoice-table-body"></tbody>
+    </table>
+    <div class="bank-section">
+      <div style="width: 60%; border: 1px solid #000; padding: 5px; font-size: 10px;">
+        <p><strong>Bank Details :</strong></p>
+        <p>Beneficiary Name : TRIPZETTA</p>
+        <p>Bank Name : YES BANK</p>
+        <p>Branch Name : EAST OF KAILASH , New Delhi-110065</p>
+        <p>IFSC CODE : YESB0000514</p>
+        <p>Current Account No : 051463700000043</p>
+      </div>
+      <div style="width: 40%; border: 1px solid #000; border-left: none; font-size: 10px;">
+        <table style="width:100%; border-collapse: collapse;">
+          <tr><td style="border: 1px solid #000; padding: 4px;">Total Amount Before Tax</td><td style="border: 1px solid #000; padding: 4px;" id="total-before-tax">0.00</td></tr>
+          <tr><td style="border: 1px solid #000; padding: 4px;">Add : SGST @ 9%</td><td style="border: 1px solid #000; padding: 4px;" id="sgst-amount">0.00</td></tr>
+          <tr><td style="border: 1px solid #000; padding: 4px;">Add : CGST @ 9%</td><td style="border: 1px solid #000; padding: 4px;" id="cgst-amount">0.00</td></tr>
+          <tr><td style="border: 1px solid #000; padding: 4px;">Add : IGST @ 18%</td><td style="border: 1px solid #000; padding: 4px;" id="igst-amount">0.00</td></tr>
+          <tr><td style="border: 1px solid #000; padding: 4px;">Rounding</td><td style="border: 1px solid #000; padding: 4px;" id="rounding">0.00</td></tr>
+          <tr><td style="border: 1px solid #000; padding: 4px;"><strong>Total Invoice Value</strong></td><td style="border: 1px solid #000; padding: 4px;" id="total-invoice-value-table">0.00</td></tr>
+        </table>
+      </div>
+    </div>
+    <div style="width: 100%; border: 1px solid #000; border-top: none; font-size: 10px; padding: 4px;">
+      <strong>Total Invoice Value ( In Words ) :</strong> <span id="total-in-words">Zero Rupees Only</span>
+    </div>
+    <div style="width: 100%; border: 1px solid #000; border-top: none; font-size: 10px; padding: 4px;">
+      <p><strong>Terms & Conditions :</strong></p>
+      <ul style="margin: 4px 0 4px 15px; padding-left: 0;">
+        <li>CHEQUE/NEFT/RTGS should be in favour of TRIPZETTA</li>
+        <li>Any refunds or claims are subject to the cancellation policy of the booking as per rules.</li>
+        <li>All disputes are subject to jurisdiction of Delhi courts.</li>
+        <li>Interest @ 18% p.a. will be charged on overdue bills.</li>
+      </ul>
+    </div>
+    <div style="width: 100%; border: 1px solid #000; border-top: none; display: flex; justify-content: flex-end; font-size: 10px; padding: 4px;">
+      <div style="text-align: right;">
+        <p>For TRIPZETTA</p>
+        <img src="https://via.placeholder.com/150x50?text=Signature" alt="Signature" style="height: 50px; margin-top: 10px;"><br>
+        <p>Authorised Signatory</p>
+      </div>
+    </div>
+    <div class="footer">
+      <p>408, 4th Floor, Devika Tower, Nehru Place, New Delhi-110019</p>
+      <p>Ph.: 011 41032067, +91 9650485130 | sales@tripzetta.com, www.tripzetta.com</p>
+    </div>
+  </div>
+  <button id="download-btn" class="download-btn">Download Invoice PDF</button>
+  <button id="print-btn" class="download-btn">Print Invoice</button>
+
+  <script>
+    function numberToWords(num) {
+      if (num === 0) return 'Zero Rupees Only';
+
+      const ones = ['Zero', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+      const tens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+      const multiples = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+      const denominations = ['Thousand', 'Lakh', 'Crore'];
+
+      function convertLessThanThousand(n) {
+        let result = '';
+        if (n >= 100) {
+          result += ones[Math.floor(n / 100)] + ' Hundred';
+          n %= 100;
+          if (n > 0) result += ' and ';
+        }
+        if (n >= 20) {
+          result += multiples[Math.floor(n / 10)];
+          n %= 10;
+          if (n > 0) result += ' ' + ones[n];
+        } else if (n >= 10) {
+          result += tens[n - 10];
+        } else if (n > 0) {
+          result += ones[n];
+        }
+        return result;
+      }
+
+      let words = '';
+      let crore = Math.floor(num / 10000000);
+      num %= 10000000;
+      let lakh = Math.floor(num / 100000);
+      num %= 100000;
+      let thousand = Math.floor(num / 1000);
+      num %= 1000;
+      let hundreds = num;
+
+      if (crore) words += convertLessThanThousand(crore) + ' Crore ';
+      if (lakh) words += convertLessThanThousand(lakh) + ' Lakh ';
+      if (thousand) words += convertLessThanThousand(thousand) + ' Thousand ';
+      if (hundreds) words += convertLessThanThousand(hundreds);
+
+      return words.trim() + ' Rupees Only';
+    }
+
+    document.getElementById('add-item').addEventListener('click', function() {
+      const itemsContainer = document.getElementById('items-container');
+      const newItem = itemsContainer.firstElementChild.cloneNode(true);
+      newItem.querySelectorAll('input, textarea').forEach(input => input.value = '');
+      itemsContainer.appendChild(newItem);
+    });
+
+    document.getElementById('items-container').addEventListener('click', function(e) {
+      if (e.target.classList.contains('remove-item')) {
+        const item = e.target.closest('.item');
+        const items = document.querySelectorAll('#items-container .item');
+        if (items.length > 1) {
+          item.remove();
+        } else {
+          alert('At least one item is required.');
+        }
+      }
+    });
+
+    document.getElementById('preview-btn').addEventListener('click', function () {
+      const form = document.getElementById('invoice-form');
+
+      // Fill invoice header info
+      document.getElementById('invoice-date').innerText = form['invoice-date'].value || '';
+      document.getElementById('invoice-no').innerText = form['invoice-no'].value || '';
+      document.getElementById('place-of-supply').innerText = form['place-of-supply'].value || '';
+      document.getElementById('customer-name').innerText = form['customer-name'].value || '';
+      document.getElementById('customer-address').innerText = form['customer-address'].value || '';
+      document.getElementById('customer-gstin').innerText = form['customer-gstin'].value || '';
+      document.getElementById('customer-state').innerText = form['customer-state'].value || '';
+
+      // Clear existing table rows
+      const tbody = document.getElementById('invoice-table-body');
+      tbody.innerHTML = '';
+
+      // Variables for totals
+      let totalBeforeTax = 0;
+      let totalSGST = 0;
+      let totalCGST = 0;
+      let totalIGST = 0;
+
+      // Process item entries
+      const items = document.querySelectorAll('#items-container .item');
+      items.forEach((item, index) => {
+        const description = item.querySelector('[name="description[]"]').value || '';
+        const sac = item.querySelector('[name="sac-code[]"]').value || '';
+        const taxType = item.querySelector('[name="tax-type[]"]').value || '';
+        const taxableValue = parseFloat(item.querySelector('[name="taxable-value[]"]').value) || 0;
+        const sgstRate = parseFloat(item.querySelector('[name="sgst-rate[]"]').value) || 0;
+        const cgstRate = parseFloat(item.querySelector('[name="cgst-rate[]"]').value) || 0;
+        const igstRate = parseFloat(item.querySelector('[name="igst-rate[]"]').value) || 0;
+
+        const sgstAmt = taxableValue * sgstRate / 100 || 0;
+        const cgstAmt = taxableValue * cgstRate / 100 || 0;
+        const igstAmt = taxableValue * igstRate / 100 || 0;
+        const total = taxableValue + sgstAmt + cgstAmt + igstAmt;
+
+        totalBeforeTax += taxableValue;
+        totalSGST += sgstAmt;
+        totalCGST += cgstAmt;
+        totalIGST += igstAmt;
+
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${index + 1}</td>
+          <td>${description.replace(/\n/g, '<br>')}</td>
+          <td>${sac}</td>
+          <td>${taxType}</td>
+          <td>${taxableValue.toFixed(2)}</td>
+          <td>${sgstRate.toFixed(2)}</td>
+          <td>${sgstAmt.toFixed(2)}</td>
+          <td>${cgstRate.toFixed(2)}</td>
+          <td>${cgstAmt.toFixed(2)}</td>
+          <td>${igstRate.toFixed(2)}</td>
+          <td>${igstAmt.toFixed(2)}</td>
+          <td>${total.toFixed(2)}</td>
+        `;
+        tbody.appendChild(row);
+      });
+
+      // Add total row
+      const totalRow = document.createElement('tr');
+      totalRow.innerHTML = `
+        <td colspan="11" style="text-align:right;font-weight:bold;">Total Invoice Value</td>
+        <td>${(totalBeforeTax + totalSGST + totalCGST + totalIGST).toFixed(2)}</td>
+      `;
+      tbody.appendChild(totalRow);
+
+      const grossTotal = totalBeforeTax + totalSGST + totalCGST + totalIGST;
+      const roundedTotal = Math.round(grossTotal);
+      const rounding = roundedTotal - grossTotal;
+
+      // Update total summary
+      document.getElementById('total-before-tax').innerText = totalBeforeTax.toFixed(2);
+      document.getElementById('sgst-amount').innerText = totalSGST.toFixed(2);
+      document.getElementById('cgst-amount').innerText = totalCGST.toFixed(2);
+      document.getElementById('igst-amount').innerText = totalIGST.toFixed(2);
+      document.getElementById('rounding').innerText = rounding.toFixed(2);
+      document.getElementById('total-invoice-value-table').innerText = roundedTotal.toFixed(2);
+      document.getElementById('total-in-words').innerText = numberToWords(roundedTotal);
+    });
+
+    document.getElementById('download-btn').addEventListener('click', function () {
+      const invoiceElement = document.getElementById('invoice');
+      html2canvas(invoiceElement).then(canvas => {
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jspdf.jsPDF('p', 'mm', 'a4');
+        const imgProps = pdf.getImageProperties(imgData);
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+        pdf.save('invoice.pdf');
+      });
+    });
+
+    document.getElementById('print-btn').addEventListener('click', function () {
+      window.print();
+    });
+  </script>
+</body>
+</html>
