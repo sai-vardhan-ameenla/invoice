@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=1024, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>Invoice Generator with Dashboard</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -136,48 +136,67 @@
       color: #888;
     }
     .invoice-page {
-      width: 100%;
-      max-width: 794px;
-      min-width: 320px;
-      margin: 15mm auto;
+      width: 210mm;
+      height: 297mm;
+      margin: 0 auto;
       background: white;
-      padding: 15mm;
+      padding: 10mm;
       border: 1px solid #000;
+      box-sizing: border-box;
     }
     @media print {
+      @page {
+        size: A4;
+        margin: 0;
+      }
       body * {
         visibility: hidden;
       }
       #invoice, #invoice * {
         visibility: visible;
       }
-      .invoice-page {
-        position: absolute;
+      #invoice {
+        position: fixed;
         top: 0;
         left: 0;
-        margin: 0;
-        padding: 15mm;
         width: 210mm;
         height: 297mm;
-        box-shadow: none;
+        margin: 0;
+        padding: 10mm;
+        box-sizing: border-box;
+        transform-origin: top left;
       }
       .download-btn, #preview-btn, #print-btn, form {
         display: none;
       }
     }
     @media screen and (max-width: 768px) {
-      .invoice-page, form {
+      .invoice-page {
+        width: 210mm;
+        height: 297mm;
         padding: 10mm;
-        font-size: 14px;
+        font-size: 10px;
+        overflow: auto;
+      }
+      .dashboard, .invoice-form-container {
+        padding: 10px;
       }
       table {
-        font-size: 9px;
+        font-size: 8px;
       }
       .stat-box {
         width: 48%;
       }
       .search-container input {
         width: 150px;
+      }
+      .header, .bank-section {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .right-info {
+        text-align: left;
+        margin-top: 10px;
       }
     }
     .header {
@@ -469,11 +488,11 @@
             <th>SAC Code</th>
             <th>Tax Type</th>
             <th>Taxable Value</th>
-            <th>SGST %</th>
+            <th>SGST%</th>
             <th>SGST Amount</th>
-            <th>CGST %</th>
+            <th>CGST%</th>
             <th>CGST Amount</th>
-            <th>IGST %</th>
+            <th>IGST%</th>
             <th>IGST Amount</th>
             <th>Total (INR)</th>
           </tr>
@@ -508,7 +527,7 @@
         <ul style="margin: 4px 0 4px 15px; padding-left: 0;">
           <li>CHEQUE/NEFT/RTGS should be in favour of TRIPZETTA</li>
           <li>Any refunds or claims are subject to the cancellation policy of the booking as per rules.</li>
-          <li>All disputes are subject to Delhi jurisdiction.</li>
+          <li>All disputes are subject to jurisdiction of Delhi courts.</li>
           <li>Interest @ 18% p.a. will be charged on overdue bills.</li>
         </ul>
       </div>
@@ -620,13 +639,6 @@
       const invoiceNo = await generateInvoiceNumber();
       document.getElementById('invoice-no').value = invoiceNo;
     }
-
-    // Enforce desktop viewport on mobile devices
-    window.addEventListener('load', function() {
-      if (/Mobi|Android/i.test(navigator.userAgent)) {
-        document.querySelector('meta[name="viewport"]').setAttribute('content', 'width=1024, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
-      }
-    });
 
     // Tab switching
     document.querySelectorAll('.tab').forEach(tab => {
@@ -1052,7 +1064,7 @@ Pending: ${document.getElementById('pending-yearly').textContent}
       } else if (e.target.classList.contains('add-sub-item')) {
         const subItemsContainer = e.target.previousElementSibling;
         const newSubItem = subItemsContainer.querySelector('.sub-item').cloneNode(true);
-        newSubItem.querySelectorAllmobiles('input, textarea').forEach(input => input.value = '');
+        newSubItem.querySelectorAll('input, textarea').forEach(input => input.value = '');
         subItemsContainer.appendChild(newSubItem);
       } else if (e.target.classList.contains('remove-sub-item')) {
         const subItem = e.target.closest('.sub-item');
@@ -1227,12 +1239,11 @@ Pending: ${document.getElementById('pending-yearly').textContent}
 
     document.getElementById('download-btn').addEventListener('click', function () {
       const invoiceElement = document.getElementById('invoice');
-      html2canvas(invoiceElement).then(canvas => {
+      html2canvas(invoiceElement, { scale: 2 }).then(canvas => {
         const imgData = canvas.toDataURL('image/png');
         const pdf = new jspdf.jsPDF('p', 'mm', 'a4');
-        const imgProps = pdf.getImageProperties(imgData);
         const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+        const pdfHeight = pdf.internal.pageSize.getHeight();
         pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
         pdf.save('invoice.pdf');
       });
@@ -1240,7 +1251,6 @@ Pending: ${document.getElementById('pending-yearly').textContent}
 
     document.getElementById('print-btn').addEventListener('click', function () {
       window.print();
-      updateDashboard();
     });
 
     // Attach event listeners for filter and search
