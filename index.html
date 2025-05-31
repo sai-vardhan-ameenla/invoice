@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=1024, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>Invoice Generator</title>
+  <title>Invoice Generator with Dashboard</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <style>
@@ -16,6 +16,69 @@
       padding: 0;
       font-family: Arial, sans-serif;
       background-color: #f4f4f4;
+    }
+    .tabs {
+      display: flex;
+      justify-content: center;
+      margin: 20px 0;
+    }
+    .tab {
+      padding: 10px 20px;
+      cursor: pointer;
+      background: #ddd;
+      margin: 0 5px;
+      border-radius: 5px;
+    }
+    .tab.active {
+      background: #007bff;
+      color: white;
+    }
+    .dashboard, .invoice-form-container, .invoice-preview {
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      background: white;
+      border: 1px solid #ccc;
+    }
+    .dashboard-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    .dashboard-header select, .dashboard-header button {
+      padding: 5px;
+      margin: 0 5px;
+    }
+    .stats {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+    }
+    .stat-box {
+      width: 18%;
+      padding: 15px;
+      margin-bottom: 20px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      text-align: center;
+      background: #f9f9f9;
+    }
+    .stat-box.monthly { background: #e6f7ff; }
+    .stat-box.yearly { background: #fffbe6; }
+    .stat-box h3 { margin: 0; font-size: 16px; }
+    .stat-box p { margin: 5px 0 0; font-size: 20px; font-weight: bold; }
+    .download-report-btn {
+      display: block;
+      width: 200px;
+      margin: 20px auto;
+      padding: 10px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
     }
     .invoice-page {
       width: 100%;
@@ -54,6 +117,9 @@
       }
       table {
         font-size: 9px;
+      }
+      .stat-box {
+        width: 48%;
       }
     }
     .header {
@@ -164,7 +230,88 @@
   </style>
 </head>
 <body>
-  <div>
+  <div class="tabs">
+    <div class="tab active" data-tab="dashboard">Dashboard</div>
+    <div class="tab" data-tab="create-invoice">Create Invoice</div>
+    <div class="tab" data-tab="invoice-preview">Invoice Preview</div>
+  </div>
+
+  <div class="dashboard" id="dashboard">
+    <h2>Dashboard</h2>
+    <div class="dashboard-header">
+      <div>
+        <label>Select Month:</label>
+        <select id="select-month">
+          <option value="1">January</option>
+          <option value="2">February</option>
+          <option value="3">March</option>
+          <option value="4">April</option>
+          <option value="5" selected>May</option>
+          <option value="6">June</option>
+          <option value="7">July</option>
+          <option value="8">August</option>
+          <option value="9">September</option>
+          <option value="10">October</option>
+          <option value="11">November</option>
+          <option value="12">December</option>
+        </select>
+        <label>Select Year:</label>
+        <select id="select-year"></select>
+        <label>Select Financial Year:</label>
+        <select id="select-fy"></select>
+        <button onclick="updateDashboard()">Filter</button>
+      </div>
+    </div>
+    <h3>Monthwise:</h3>
+    <div class="stats">
+      <div class="stat-box monthly">
+        <h3>Invoices (May-2025)</h3>
+        <p id="monthly-invoices">0</p>
+      </div>
+      <div class="stat-box monthly">
+        <h3>Subtotal (May-2025)</h3>
+        <p id="monthly-subtotal">Rs. 0</p>
+      </div>
+      <div class="stat-box monthly">
+        <h3>GST Total (May-2025)</h3>
+        <p id="monthly-gst">Rs. 0</p>
+      </div>
+      <div class="stat-box monthly">
+        <h3>Earnings (May-2025)</h3>
+        <p id="monthly-earnings">Rs. 0</p>
+      </div>
+      <div class="stat-box monthly">
+        <h3>Pending (May-2025)</h3>
+        <p id="monthly-pending">Rs. 0</p>
+      </div>
+    </div>
+    <h3>Yearwise:</h3>
+    <div class="stats">
+      <div class="stat-box yearly">
+        <h3>Invoices (2024-2025)</h3>
+        <p id="yearly-invoices">0</p>
+      </div>
+      <div class="stat-box yearly">
+        <h3>Subtotal (2024-2025)</h3>
+        <p id="yearly-subtotal">Rs. 0</p>
+      </div>
+      <div class="stat-box yearly">
+        <h3>GST Total (2024-2025)</h3>
+        <p id="yearly-gst">Rs. 0</p>
+      </div>
+      <div class="stat-box yearly">
+        <h3>Earnings (2024-2025)</h3>
+        <p id="yearly-earnings">Rs. 0</p>
+      </div>
+      <div class="stat-box yearly">
+        <h3>Pending (2024-2025)</h3>
+        <p id="yearly-pending">Rs. 0</p>
+      </div>
+    </div>
+    <button class="download-report-btn" onclick="downloadReport()">Download Report</button>
+  </div>
+
+  <div class="invoice-form-container" id="create-invoice" style="display: none;">
     <h2>Enter Invoice Details</h2>
     <form id="invoice-form">
       <label for="form-invoice-date">Invoice Date:</label>
@@ -208,94 +355,94 @@
     </form>
   </div>
 
-  <div class="invoice-page" id="invoice">
-    <div class="header">
-      <div>
-        <p class="title">TAX INVOICE</p>
-        <div class="section">
-          <p><span class="bold">Invoice Date :</span> <span id="invoice-date"></span></p>
-          <p><span class="bold">Invoice No :</span> <span id="invoice-no"></span></p>
-          <p><span class="bold">Place of Supply :</span> <span id="place-of-supply"></span></p>
+  <div class="invoice-preview" id="invoice-preview" style="display: none;">
+    <div class="invoice-page" id="invoice">
+      <div class="header">
+        <div>
+          <p class="title">TAX INVOICE</p>
+          <div class="section">
+            <p><span class="bold">Invoice Date :</span> <span id="invoice-date"></span></p>
+            <p><span class="bold">Invoice No :</span> <span id="invoice-no"></span></p>
+            <p><span class="bold">Place of Supply :</span> <span id="place-of-supply"></span></p>
+          </div>
+          <div class="section">
+            <p><span class="bold">Name :</span> <span id="customer-name"></span></p>
+            <p><span class="bold">Address :</span> <span id="customer-address"></span></p>
+            <p><span class="bold">GSTIN :</span> <span id="customer-gstin"></span></p>
+            <p><span class="bold">STATE :</span> <span id="customer-state"></span></p>
+          </div>
         </div>
-        <div class="section">
-          <p><span class="bold">Name :</span> <span id="customer-name"></span></p>
-          <p><span class="bold">Address :</span> <span id="customer-address"></span></p>
-          <p><span class="bold">GSTIN :</span> <span id="customer-gstin"></span></p>
-          <p><span class="bold">STATE :</span> <span id="customer-state"></span></p>
+        <div style="text-align: right;">
+          <img src="image.png" class="logo" alt="Tripzetta Logo">
+          <div class="right-info">
+            <p><strong>GSTIN :</strong> 07APDPA8620A1ZL</p>
+            <p><strong>PAN :</strong> APDPA8620A</p>
+            <p><strong>Regd. Address :</strong> 408 4th Floor Devika Tower Nehru Place New Delhi</p>
+            <p><strong>Contact:</strong> +919650485130</p>
+          </div>
         </div>
       </div>
-      <div style="text-align: right;">
-        <img src="image.png" class="logo" alt="Tripzetta Logo">
-        <div class="right-info">
-          <p><strong>GSTIN :</strong> 07APDPA8620A1ZL</p>
-          <p><strong>PAN :</strong> APDPA8620A</p>
-          <p><strong>Regd. Address :</strong> 408 4th Floor Devika
-             Tower Nehru Place New Delhi</p>
-          <p><strong>Contact:</strong> +919650485130</p>
+      <table id="invoice-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Service Description</th>
+            <th>SAC Code</th>
+            <th>Tax Type</th>
+            <th>Taxable Value</th>
+            <th>SGST %</th>
+            <th>SGST Amount</th>
+            <th>CGST %</th>
+            <th>CGST Amount</th>
+            <th>IGST %</th>
+            <th>IGST Amount</th>
+            <th>Total (INR)</th>
+          </tr>
+        </thead>
+        <tbody id="invoice-table-body"></tbody>
+      </table>
+      <div class="bank-section">
+        <div style="width: 60%; border: 1px solid #000; padding: 5px; font-size: 10px;">
+          <p><strong>Bank Details :</strong></p>
+          <p>Beneficiary Name : TRIPZETTA</p>
+          <p>Bank Name : YES BANK</p>
+          <p>Branch Name : EAST OF KAILASH , New Delhi-110065</p>
+          <p>IFSC CODE : YESB0000514</p>
+          <p>Current Account No : 051463700000043</p>
+        </div>
+        <div style="width: 40%; border: 1px solid #000; border-left: none; font-size: 10px;">
+          <table style="width:100%; border-collapse: collapse;">
+            <tr><td style="border: 1px solid #000; padding: 4px;">Total Amount Before Tax</td><td style="border: 1px solid #000; padding: 4px;" id="total-before-tax">0.00</td></tr>
+            <tr><td style="border: 1px solid #000; padding: 4px;">Add : SGST @ 9%</td><td style="border: 1px solid #000; padding: 4px;" id="sgst-amount">0.00</td></tr>
+            <tr><td style="border: 1px solid #000; padding: 4px;">Add : CGST @ 9%</td><td style="border: 1px solid #000; padding: 4px;" id="cgst-amount">0.00</td></tr>
+            <tr><td style="border: 1px solid #000; padding: 4px;">Add : IGST @ 18%</td><td style="border: 1px solid #000; padding: 4px;" id="igst-amount">0.00</td></tr>
+            <tr><td style="border: 1px solid #000; padding: 4px;">Rounding</td><td style="border: 1px solid #000; padding: 4px;" id="rounding">0.00</td></tr>
+            <tr><td style="border: 1px solid #000; padding: 4px;"><strong>Total Invoice Value</strong></td><td style="border: 1px solid #000; padding: 4px;" id="total-invoice-value-table">0.00</td></tr>
+          </table>
+        </div>
+      </div>
+      <div style="width: 100%; border: 1px solid #000; border-top: none; font-size: 10px; padding: 4px;">
+        <strong>Total Invoice Value ( In Words ) :</strong> <span id="total-in-words">Zero Rupees Only</span>
+      </div>
+      <div style="width: 100%; border: 1px solid #000; border-top: none; font-size: 10px; padding: 4px;">
+        <p><strong>Terms & Conditions :</strong></p>
+        <ul style="margin: 4px 0 4px 15px; padding-left: 0;">
+          <li>CHEQUE/NEFT/RTGS should be in favour of TRIPZETTA</li>
+          <li>Any refunds or claims are subject to the cancellation policy of the booking as per rules.</li>
+          <li>All disputes are subject to jurisdiction of Delhi courts.</li>
+          <li>Interest @ 18% p.a. will be charged on overdue bills.</li>
+        </ul>
+      </div>
+      <div style="width: 100%; border: 1px solid #000; border-top: none; display: flex; justify-content: flex-end; font-size: 10px; padding: 4px;">
+        <div style="text-align: right;">
+          <p>For TRIPZETTA</p>
+          <p>Authorised Signatory</p>
         </div>
       </div>
     </div>
-    <table id="invoice-table">
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Service Description</th>
-          <th>SAC Code</th>
-          <th>Tax Type</th>
-          <th>Taxable Value</th>
-          <th>SGST %</th>
-          <th>SGST Amount</th>
-          <th>CGST %</th>
-          <th>CGST Amount</th>
-          <th>IGST %</th>
-          <th>IGST Amount</th>
-          <th>Total (INR)</th>
-        </tr>
-      </thead>
-      <tbody id="invoice-table-body"></tbody>
-    </table>
-    <div class="bank-section">
-      <div style="width: 60%; border: 1px solid #000; padding: 5px; font-size: 10px;">
-        <p><strong>Bank Details :</strong></p>
-        <p>Beneficiary Name : TRIPZETTA</p>
-        <p>Bank Name : YES BANK</p>
-        <p>Branch Name : EAST OF KAILASH , New Delhi-110065</p>
-        <p>IFSC CODE : YESB0000514</p>
-        <p>Current Account No : 051463700000043</p>
-      </div>
-      <div style="width: 40%; border: 1px solid #000; border-left: none; font-size: 10px;">
-        <table style="width:100%; border-collapse: collapse;">
-          <tr><td style="border: 1px solid #000; padding: 4px;">Total Amount Before Tax</td><td style="border: 1px solid #000; padding: 4px;" id="total-before-tax">0.00</td></tr>
-          <tr><td style="border: 1px solid #000; padding: 4px;">Add : SGST @ 9%</td><td style="border: 1px solid #000; padding: 4px;" id="sgst-amount">0.00</td></tr>
-          <tr><td style="border: 1px solid #000; padding: 4px;">Add : CGST @ 9%</td><td style="border: 1px solid #000; padding: 4px;" id="cgst-amount">0.00</td></tr>
-          <tr><td style="border: 1px solid #000; padding: 4px;">Add : IGST @ 18%</td><td style="border: 1px solid #000; padding: 4px;" id="igst-amount">0.00</td></tr>
-          <tr><td style="border: 1px solid #000; padding: 4px;">Rounding</td><td style="border: 1px solid #000; padding: 4px;" id="rounding">0.00</td></tr>
-          <tr><td style="border: 1px solid #000; padding: 4px;"><strong>Total Invoice Value</strong></td><td style="border: 1px solid #000; padding: 4px;" id="total-invoice-value-table">0.00</td></tr>
-        </table>
-      </div>
-    </div>
-    <div style="width: 100%; border: 1px solid #000; border-top: none; font-size: 10px; padding: 4px;">
-      <strong>Total Invoice Value ( In Words ) :</strong> <span id="total-in-words">Zero Rupees Only</span>
-    </div>
-    <div style="width: 100%; border: 1px solid #000; border-top: none; font-size: 10px; padding: 4px;">
-      <p><strong>Terms & Conditions :</strong></p>
-      <ul style="margin: 4px 0 4px 15px; padding-left: 0;">
-        <li>CHEQUE/NEFT/RTGS should be in favour of TRIPZETTA</li>
-        <li>Any refunds or claims are subject to the cancellation policy of the booking as per rules.</li>
-        <li>All disputes are subject to jurisdiction of Delhi courts.</li>
-        <li>Interest @ 18% p.a. will be charged on overdue bills.</li>
-      </ul>
-    </div>
-    <div style="width: 100%; border: 1px solid #000; border-top: none; display: flex; justify-content: flex-end; font-size: 10px; padding: 4px;">
-      <div style="text-align: right;">
-        <p>For TRIPZETTA</p>
-        
-        <p>Authorised Signatory</p>
-      </div>
-    </div>
+    <button id="download-btn" class="download-btn">Download Invoice PDF</button>
+    <button id="print-btn" class="download-btn">Print Invoice</button>
   </div>
-  <button id="download-btn" class="download-btn">Download Invoice PDF</button>
-  <button id="print-btn" class="download-btn">Print Invoice</button>
 
   <script>
     // Enforce desktop viewport on mobile devices
@@ -304,6 +451,194 @@
         document.querySelector('meta[name="viewport"]').setAttribute('content', 'width=1024, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
       }
     });
+
+    // Tab switching
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', function() {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        this.classList.add('active');
+
+        document.querySelectorAll('.dashboard, .invoice-form-container, .invoice-preview').forEach(section => {
+          section.style.display = 'none';
+        });
+        document.getElementById(this.dataset.tab).style.display = 'block';
+
+        if (this.dataset.tab === 'dashboard') updateDashboard();
+      });
+    });
+
+    // Populate year and financial year dropdowns
+    const currentYear = new Date().getFullYear();
+    const selectYear = document.getElementById('select-year');
+    const selectFY = document.getElementById('select-fy');
+    for (let year = currentYear - 5; year <= currentYear + 5; year++) {
+      const option = document.createElement('option');
+      option.value = year;
+      option.text = year;
+      if (year === currentYear) option.selected = true;
+      selectYear.appendChild(option);
+
+      const fyOption = document.createElement('option');
+      fyOption.value = `${year}-${year + 1}`;
+      fyOption.text = `Apr-${year} to Mar-${year + 1}`;
+      if (year === currentYear - 1) fyOption.selected = true;
+      selectFY.appendChild(fyOption);
+    }
+
+    // Save invoice to localStorage
+    function saveInvoice(invoiceData) {
+      let invoices = JSON.parse(localStorage.getItem('invoices')) || [];
+      invoices.push(invoiceData);
+      localStorage.setItem('invoices', JSON.stringify(invoices));
+    }
+
+    // Clean up localStorage (optional, call if needed)
+    function cleanLocalStorage() {
+      let invoices = JSON.parse(localStorage.getItem('invoices')) || [];
+      invoices = invoices.filter(invoice => {
+        return invoice && invoice.date && Array.isArray(invoice.items) && invoice.items.every(item => {
+          return item && typeof item.taxableValue !== 'undefined' && Array.isArray(item.subItems);
+        });
+      });
+      localStorage.setItem('invoices', JSON.stringify(invoices));
+    }
+
+    // Update dashboard statistics
+    function updateDashboard() {
+      const selectedMonth = parseInt(document.getElementById('select-month').value);
+      const selectedYear = parseInt(document.getElementById('select-year').value);
+      const selectedFY = document.getElementById('select-fy').value;
+      const [fyStart, fyEnd] = selectedFY.split('-').map(Number);
+
+      let invoices = JSON.parse(localStorage.getItem('invoices')) || [];
+
+      // Monthly stats
+      let monthlyInvoices = 0;
+      let monthlySubtotal = 0;
+      let monthlyGST = 0;
+      let monthlyEarnings = 0;
+      let monthlyPending = 0;
+
+      // Yearly stats
+      let yearlyInvoices = 0;
+      let yearlySubtotal = 0;
+      let yearlyGST = 0;
+      let yearlyEarnings = 0;
+      let yearlyPending = 0;
+
+      const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+      const selectedMonthName = monthNames[selectedMonth - 1];
+
+      invoices.forEach(invoice => {
+        // Skip invalid invoices
+        if (!invoice || !invoice.date || !Array.isArray(invoice.items)) return;
+
+        const invoiceDate = new Date(invoice.date);
+        // Check if the date is valid
+        if (isNaN(invoiceDate.getTime())) return;
+
+        const invoiceMonth = invoiceDate.getMonth() + 1;
+        const invoiceYear = invoiceDate.getFullYear();
+
+        // Determine financial year for the invoice
+        const invoiceFY = invoiceMonth >= 4 ? `${invoiceYear}-${invoiceYear + 1}` : `${invoiceYear - 1}-${invoiceYear}`;
+
+        const subtotal = invoice.items.reduce((sum, item) => {
+          const itemValue = parseFloat(item.taxableValue) || 0;
+          const subItemsValue = Array.isArray(item.subItems) ? 
+            item.subItems.reduce((subSum, subItem) => subSum + (parseFloat(subItem.taxableValue) || 0), 0) : 0;
+          return sum + itemValue + subItemsValue;
+        }, 0);
+
+        const gstTotal = invoice.items.reduce((sum, item) => {
+          const sgst = (parseFloat(item.taxableValue) || 0) * (parseFloat(item.sgstRate) || 0) / 100;
+          const cgst = (parseFloat(item.taxableValue) || 0) * (parseFloat(item.cgstRate) || 0) / 100;
+          const igst = (parseFloat(item.taxableValue) || 0) * (parseFloat(item.igstRate) || 0) / 100;
+          const subItemsGST = Array.isArray(item.subItems) ? item.subItems.reduce((subSum, subItem) => {
+            const subSGST = (parseFloat(subItem.taxableValue) || 0) * (parseFloat(item.sgstRate) || 0) / 100;
+            const subCGST = (parseFloat(subItem.taxableValue) || 0) * (parseFloat(item.cgstRate) || 0) / 100;
+            const subIGST = (parseFloat(subItem.taxableValue) || 0) * (parseFloat(item.igstRate) || 0) / 100;
+            return subSum + subSGST + subCGST + subIGST;
+          }, 0) : 0;
+          return sum + sgst + cgst + igst + subItemsGST;
+        }, 0);
+
+        const earnings = subtotal + gstTotal;
+        const pending = earnings; // Assuming pending = earnings for simplicity
+
+        // Monthly stats
+        if (invoiceMonth === selectedMonth && invoiceYear === selectedYear) {
+          monthlyInvoices++;
+          monthlySubtotal += subtotal;
+          monthlyGST += gstTotal;
+          monthlyEarnings += earnings;
+          monthlyPending += pending;
+        }
+
+        // Yearly stats (Financial Year: Apr to Mar)
+        if (invoiceFY === selectedFY) {
+          yearlyInvoices++;
+          yearlySubtotal += subtotal;
+          yearlyGST += gstTotal;
+          yearlyEarnings += earnings;
+          yearlyPending += pending;
+        }
+      });
+
+      // Update monthly stats
+      document.getElementById('monthly-invoices').innerText = monthlyInvoices;
+      document.getElementById('monthly-subtotal').innerText = `Rs. ${monthlySubtotal.toLocaleString('en-IN')}`;
+      document.getElementById('monthly-gst').innerText = `Rs. ${monthlyGST.toLocaleString('en-IN')}`;
+      document.getElementById('monthly-earnings').innerText = `Rs. ${monthlyEarnings.toLocaleString('en-IN')}`;
+      document.getElementById('monthly-pending').innerText = `Rs. ${monthlyPending.toLocaleString('en-IN')}`;
+
+      // Update monthly stat box titles
+      document.querySelectorAll('.stat-box.monthly h3').forEach(h3 => {
+        h3.innerText = h3.innerText.replace(/\(.*\)/, `(${selectedMonthName}-${selectedYear})`);
+      });
+
+      // Update yearly stats
+      document.getElementById('yearly-invoices').innerText = yearlyInvoices;
+      document.getElementById('yearly-subtotal').innerText = `Rs. ${yearlySubtotal.toLocaleString('en-IN')}`;
+      document.getElementById('yearly-gst').innerText = `Rs. ${yearlyGST.toLocaleString('en-IN')}`;
+      document.getElementById('yearly-earnings').innerText = `Rs. ${yearlyEarnings.toLocaleString('en-IN')}`;
+      document.getElementById('yearly-pending').innerText = `Rs. ${yearlyPending.toLocaleString('en-IN')}`;
+
+      // Update yearly stat box titles
+      document.querySelectorAll('.stat-box.yearly h3').forEach(h3 => {
+        h3.innerText = h3.innerText.replace(/\(.*\)/, `(${fyStart}-${fyEnd})`);
+      });
+    }
+
+    // Download report (basic text summary for now)
+    function downloadReport() {
+      const selectedMonth = document.getElementById('select-month').options[document.getElementById('select-month').selectedIndex].text;
+      const selectedYear = document.getElementById('select-year').value;
+      const selectedFY = document.getElementById('select-fy').value;
+
+      const report = `
+Dashboard Report
+Month: ${selectedMonth}-${selectedYear}
+Invoices: ${document.getElementById('monthly-invoices').innerText}
+Subtotal: ${document.getElementById('monthly-subtotal').innerText}
+GST Total: ${document.getElementById('monthly-gst').innerText}
+Earnings: ${document.getElementById('monthly-earnings').innerText}
+Pending: ${document.getElementById('monthly-pending').innerText}
+
+Financial Year: ${selectedFY}
+Invoices: ${document.getElementById('yearly-invoices').innerText}
+Subtotal: ${document.getElementById('yearly-subtotal').innerText}
+GST Total: ${document.getElementById('yearly-gst').innerText}
+Earnings: ${document.getElementById('yearly-earnings').innerText}
+Pending: ${document.getElementById('yearly-pending').innerText}
+      `;
+
+      const blob = new Blob([report], { type: 'text/plain' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'dashboard-report.txt';
+      link.click();
+    }
 
     function numberToWords(num) {
       if (num === 0) return 'Zero Rupees Only';
@@ -409,6 +744,8 @@
       let totalIGST = 0;
 
       const items = document.querySelectorAll('#items-container .item');
+      const invoiceItems = [];
+
       items.forEach((item, index) => {
         const description = item.querySelector('[name="description[]"]').value || '';
         const sac = item.querySelector('[name="sac-code[]"]').value || '';
@@ -446,6 +783,7 @@
         tbody.appendChild(row);
 
         const subItems = item.querySelectorAll('.sub-item');
+        const subItemsData = [];
         subItems.forEach((subItem) => {
           const subDescription = subItem.querySelector('[name="sub-description[]"]').value || '';
           const subTaxableValue = parseFloat(subItem.querySelector('[name="sub-taxable-value[]"]').value) || 0;
@@ -477,7 +815,23 @@
               <td>${total.toFixed(2)}</td>
             `;
             tbody.appendChild(subRow);
+
+            subItemsData.push({
+              description: subDescription,
+              taxableValue: subTaxableValue
+            });
           }
+        });
+
+        invoiceItems.push({
+          description,
+          sacCode: sac,
+          taxType,
+          taxableValue,
+          sgstRate,
+          cgstRate,
+          igstRate,
+          subItems: subItemsData
         });
       });
 
@@ -499,6 +853,31 @@
       document.getElementById('rounding').innerText = rounding.toFixed(2);
       document.getElementById('total-invoice-value-table').innerText = roundedTotal.toFixed(2);
       document.getElementById('total-in-words').innerText = numberToWords(roundedTotal);
+
+      // Save invoice to localStorage
+      const invoiceData = {
+        date: form['invoice-date'].value,
+        invoiceNo: form['invoice-no'].value,
+        placeOfSupply: form['place-of-supply'].value,
+        customerName: form['customer-name'].value,
+        customerAddress: form['customer-address'].value,
+        customerGSTIN: form['customer-gstin'].value,
+        customerState: form['customer-state'].value,
+        items: invoiceItems,
+        total: roundedTotal
+      };
+      saveInvoice(invoiceData);
+
+      // Update dashboard metrics immediately after saving
+      updateDashboard();
+
+      // Switch to invoice preview tab
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelector('.tab[data-tab="invoice-preview"]').classList.add('active');
+      document.querySelectorAll('.dashboard, .invoice-form-container, .invoice-preview').forEach(section => {
+        section.style.display = 'none';
+      });
+      document.getElementById('invoice-preview').style.display = 'block';
     });
 
     document.getElementById('download-btn').addEventListener('click', function () {
@@ -516,7 +895,12 @@
 
     document.getElementById('print-btn').addEventListener('click', function () {
       window.print();
+      // Update dashboard metrics immediately after printing
+      updateDashboard();
     });
+
+    // Initial dashboard update
+    updateDashboard();
   </script>
 </body>
 </html>
