@@ -36,7 +36,7 @@
       background: #007bff;
       color: white;
     }
-    .dashboard, .invoice-form-container, .invoice-preview {
+    .dashboard, .invoice-form-container, .invoice-preview, .purchase-form-container {
       width: 100%;
       max-width: 1200px;
       margin: 0 auto;
@@ -103,19 +103,19 @@
       border-radius: 5px;
       cursor: pointer;
     }
-    .invoice-list {
+    .invoice-list, .purchase-list {
       margin-top: 20px;
     }
-    .invoice-list table {
+    .invoice-list table, .purchase-list table {
       width: 100%;
       border-collapse: collapse;
     }
-    .invoice-list th, .invoice-list td {
+    .invoice-list th, .invoice-list td, .purchase-list th, .purchase-list td {
       border: 1px solid #ddd;
       padding: 8px;
       text-align: left;
     }
-    .invoice-list th {
+    .invoice-list th, .purchase-list th {
       background-color: #f2f2f2;
     }
     .cancel-btn, .edit-btn {
@@ -178,7 +178,7 @@
         font-size: 10px;
         overflow: auto;
       }
-      .dashboard, .invoice-form-container {
+      .dashboard, .invoice-form-container, .purchase-form-container {
         padding: 10px;
       }
       table {
@@ -241,7 +241,7 @@
     .terms, .signature {
       font-size: 10px;
     }
-    .download-btn, #preview-btn, #print-btn {
+    .download-btn, #preview-btn, #print-btn, .form-btn {
       display: block;
       width: 90%;
       max-width: 300px;
@@ -249,6 +249,13 @@
       padding: 10px;
       font-size: 14px;
       cursor: pointer;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+    }
+    #reset-purchase-btn {
+      background: #ff4d4d;
     }
     .right-info {
       font-size: 10px;
@@ -273,6 +280,16 @@
       max-width: 400px;
       padding: 5px;
       margin-bottom: 10px;
+    }
+    input[type="radio"] {
+      width: auto;
+      margin-right: 10px;
+    }
+    .radio-group {
+      margin: 10px 0;
+    }
+    #payment-method {
+      display: none;
     }
     #items-container .item {
       margin-bottom: 20px;
@@ -309,6 +326,7 @@
 <body>
   <div class="tabs">
     <div class="tab active" data-tab="services">Dashboard</div>
+    <div class="tab" data-tab="purchases">Purchase Records</div>
     <div class="tab" data-tab="create-invoice">Create Invoice</div>
     <div class="tab" data-tab="invoice-btn">Invoice Preview</div>
   </div>
@@ -407,6 +425,60 @@
       </table>
     </div>
     <button class="download-report-btn" onclick="downloadReport()">Download Report</button>
+  </div>
+
+  <div class="purchase-form-container" id="purchases" style="display: none;">
+    <h2>Purchase Records</h2>
+    <form id="purchase-form">
+      <label for="purchase-date">Purchase Date:</label>
+      <input type="date" id="purchase-date" name="purchase-date" required>
+      <label>Payment Type:</label>
+      <div class="radio-group">
+        <input type="radio" id="payment-credit" name="payment-type" value="credit" required>
+        <label for="payment-credit">Credit</label>
+        <input type="radio" id="payment-cash" name="payment-type" value="cash">
+        <label for="payment-cash">Cash</label>
+      </div>
+      <label for="payment-method" id="payment-method-label">Payment Method (if Cash):</label>
+      <input type="text" id="payment-method" name="payment-method" placeholder="e.g., UPI, Card">
+      <label for="passenger-names">Passenger Names:</label>
+      <textarea id="passenger-names" name="passenger-names" required></textarea>
+      <label for="hotel-booked">Hotel Booked:</label>
+      <input type="text" id="hotel-booked" name="hotel-booked" required>
+      <label for="service-description">Service Description:</label>
+      <textarea id="service-description" name="service-description" required></textarea>
+      <label for="commission">Commission (INR):</label>
+      <input type="number" id="commission" name="commission" step="0.01" required>
+      <label for="tds">TDS (INR):</label>
+      <input type="number" id="tds" name="tds" step="0.01" required>
+      <label for="gross-amount">Gross Amount (INR):</label>
+      <input type="number" id="gross-amount" name="gross-amount" step="0.01" required>
+      <label for="net-amount">Net Amount (INR):</label>
+      <input type="number" id="net-amount" name="net-amount" step="0.01" readonly>
+      <button type="button" class="form-btn" id="save-purchase-btn">Save Purchase</button>
+      <button type="button" class="form-btn" id="reset-purchase-btn">Reset Form</button>
+    </form>
+    <h3>Purchase List</h3>
+    <div class="purchase-list">
+      <table>
+        <thead>
+          <tr>
+            <th>Purchase ID</th>
+            <th>Date</th>
+            <th>Payment Type</th>
+            <th>Payment Method</th>
+            <th>Passengers</th>
+            <th>Hotel</th>
+            <th>Service</th>
+            <th>Commission</th>
+            <th>TDS</th>
+            <th>Gross</th>
+            <th>Net</th>
+          </tr>
+        </thead>
+        <tbody id="purchase-list-body"></tbody>
+      </table>
+    </div>
   </div>
 
   <div class="invoice-form-container" id="create-invoice" style="display: none;">
@@ -608,8 +680,40 @@
       }
     }
 
-    // Reset form for new invoice
-    async function resetForm() {
+    // Generate unique purchase ID
+    async function generatePurchaseId() {
+      try {
+        const querySnapshot = await getDocs(collection(db, 'purchases'));
+        let maxNumber = 0;
+        querySnapshot.forEach(doc => {
+          const purchaseId = doc.data().purchaseId || '';
+          if (purchaseId.startsWith('PUR-')) {
+            const number = parseInt(purchaseId.replace('PUR-', '')) || 0;
+            if (number > maxNumber) maxNumber = number;
+          }
+        });
+        const nextNumber = maxNumber + 1;
+        return `PUR-${nextNumber.toString().padStart(4, '0')}`;
+      } catch (error) {
+        console.error('Error generating purchase ID:', error);
+        alert('Error generating purchase ID.');
+        return 'PUR-0001';
+      }
+    }
+
+    // Reset purchase form
+    async function resetPurchaseForm() {
+      const form = document.getElementById('purchase-form');
+      form.reset();
+      document.getElementById('payment-method').style.display = 'none';
+      document.getElementById('payment-method-label').style.display = 'none';
+      document.getElementById('net-amount').value = '';
+      document.getElementById('payment-credit').checked = false;
+      document.getElementById('payment-cash').checked = false;
+    }
+
+    // Reset invoice form
+    async function resetInvoiceForm() {
       const form = document.getElementById('invoice-form');
       form.reset();
       document.getElementById('form-title').innerText = 'Create Invoice';
@@ -646,15 +750,18 @@
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         this.classList.add('active');
 
-        document.querySelectorAll('.dashboard, .invoice-form-container, .invoice-preview').forEach(section => {
+        document.querySelectorAll('.dashboard, .purchase-form-container, .invoice-form-container, .invoice-preview').forEach(section => {
           section.style.display = 'none';
         });
         document.getElementById(this.dataset.tab).style.display = 'block';
 
         if (this.dataset.tab === 'services') {
           updateDashboard();
+        } else if (this.dataset.tab === 'purchases') {
+          updatePurchaseList();
+          await resetPurchaseForm();
         } else if (this.dataset.tab === 'create-invoice' && !editingInvoiceId) {
-          await resetForm();
+          await resetInvoiceForm();
         }
       });
     });
@@ -702,6 +809,56 @@
         console.error('Error saving invoice:', error);
         alert('Failed to save invoice.');
         return false;
+      }
+    }
+
+    // Save purchase to Firestore
+    async function savePurchase(purchaseData) {
+      try {
+        purchaseData.purchaseId = await generatePurchaseId();
+        await addDoc(collection(db, 'purchases'), purchaseData);
+        alert('Purchase saved successfully.');
+        return true;
+      } catch (error) {
+        console.error('Error saving purchase:', error);
+        alert('Failed to save purchase.');
+        return false;
+      }
+    }
+
+    // Update purchase list
+    async function updatePurchaseList() {
+      if (!db) {
+        alert('Firestore is not initialized.');
+        return;
+      }
+
+      const purchaseListBody = document.getElementById('purchase-list-body');
+      purchaseListBody.innerHTML = '';
+
+      try {
+        const querySnapshot = await getDocs(collection(db, 'purchases'));
+        querySnapshot.forEach(doc => {
+          const purchase = doc.data();
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${purchase.purchaseId}</td>
+            <td>${purchase.purchaseDate}</td>
+            <td>${purchase.paymentType}</td>
+            <td>${purchase.paymentMethod || '-'}</td>
+            <td>${purchase.passengerNames.replace(/\n/g, '<br>')}</td>
+            <td>${purchase.hotelBooked}</td>
+            <td>${purchase.serviceDescription.replace(/\n/g, '<br>')}</td>
+            <td>Rs. ${purchase.commission.toFixed(2)}</td>
+            <td>Rs. ${purchase.tds.toFixed(2)}</td>
+            <td>Rs. ${purchase.grossAmount.toFixed(2)}</td>
+            <td>Rs. ${purchase.netAmount.toFixed(2)}</td>
+          `;
+          purchaseListBody.appendChild(row);
+        });
+      } catch (error) {
+        console.error('Error fetching purchases:', error);
+        alert('Failed to load purchase data.');
       }
     }
 
@@ -795,7 +952,7 @@
         // Switch to create-invoice tab
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         document.querySelector('.tab[data-tab="create-invoice"]').classList.add('active');
-        document.querySelectorAll('.dashboard, .invoice-form-container, .invoice-preview').forEach(section => {
+        document.querySelectorAll('.dashboard, .purchase-form-container, .invoice-form-container, .invoice-preview').forEach(section => {
           section.style.display = 'none';
         });
         document.getElementById('create-invoice').style.display = 'block';
@@ -1037,6 +1194,64 @@ Pending: ${document.getElementById('pending-yearly').textContent}
       return words.trim() + ' Rupees Only';
     }
 
+    // Purchase form logic
+    document.getElementById('payment-credit').addEventListener('change', function() {
+      document.getElementById('payment-method').style.display = 'none';
+      document.getElementById('payment-method-label').style.display = 'none';
+      document.getElementById('payment-method').value = '';
+    });
+
+    document.getElementById('payment-cash').addEventListener('change', function() {
+      document.getElementById('payment-method').style.display = 'block';
+      document.getElementById('payment-method-label').style.display = 'block';
+    });
+
+    function calculateNetAmount() {
+      const commission = parseFloat(document.getElementById('commission').value) || 0;
+      const tds = parseFloat(document.getElementById('tds').value) || 0;
+      const gross = parseFloat(document.getElementById('gross-amount').value) || 0;
+      const net = gross - commission + tds;
+      document.getElementById('net-amount').value = net.toFixed(2);
+    }
+
+    document.getElementById('commission').addEventListener('input', calculateNetAmount);
+    document.getElementById('tds').addEventListener('input', calculateNetAmount);
+    document.getElementById('gross-amount').addEventListener('input', calculateNetAmount);
+
+    document.getElementById('save-purchase-btn').addEventListener('click', async function() {
+      const form = document.getElementById('purchase-form');
+      if (!form.checkValidity()) {
+        alert('Please fill all required fields.');
+        return;
+      }
+
+      const paymentType = document.querySelector('input[name="payment-type"]:checked').value;
+      const paymentMethod = paymentType === 'cash' ? document.getElementById('payment-method').value : '';
+
+      const purchaseData = {
+        purchaseDate: document.getElementById('purchase-date').value,
+        paymentType: paymentType,
+        paymentMethod: paymentMethod,
+        passengerNames: document.getElementById('passenger-names').value,
+        hotelBooked: document.getElementById('hotel-booked').value,
+        serviceDescription: document.getElementById('service-description').value,
+        commission: parseFloat(document.getElementById('commission').value) || 0,
+        tds: parseFloat(document.getElementById('tds').value) || 0,
+        grossAmount: parseFloat(document.getElementById('gross-amount').value) || 0,
+        netAmount: parseFloat(document.getElementById('net-amount').value) || 0
+      };
+
+      const saved = await savePurchase(purchaseData);
+      if (saved) {
+        await resetPurchaseForm();
+        updatePurchaseList();
+      }
+    });
+
+    document.getElementById('reset-purchase-btn').addEventListener('click', async function() {
+      await resetPurchaseForm();
+    });
+
     document.getElementById('add-item').addEventListener('click', function() {
       const itemsContainer = document.getElementById('items-container');
       const newItem = itemsContainer.firstElementChild.cloneNode(true);
@@ -1223,7 +1438,7 @@ Pending: ${document.getElementById('pending-yearly').textContent}
       if (!saved) return;
 
       // Reset form after saving
-      await resetForm();
+      await resetInvoiceForm();
 
       // Update dashboard
       updateDashboard();
@@ -1231,7 +1446,7 @@ Pending: ${document.getElementById('pending-yearly').textContent}
       // Switch to invoice preview tab
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       document.querySelector('.tab[data-tab="invoice-btn"]').classList.add('active');
-      document.querySelectorAll('.dashboard, .invoice-form-container, .invoice-preview').forEach(section => {
+      document.querySelectorAll('.dashboard, .purchase-form-container, .invoice-form-container, .invoice-preview').forEach(section => {
         section.style.display = 'none';
       });
       document.getElementById('invoice-btn').style.display = 'block';
@@ -1264,8 +1479,9 @@ Pending: ${document.getElementById('pending-yearly').textContent}
     // Initial dashboard update
     updateDashboard();
 
-    // Initialize form with unique invoice number
-    resetForm();
+    // Initialize forms
+    resetInvoiceForm();
+    resetPurchaseForm();
   </script>
 </body>
 </html>
