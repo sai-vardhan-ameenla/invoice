@@ -82,7 +82,10 @@
         transform: scale(1);
         transform-origin: top left;
       }
-      .download-btn, #save-btn {
+      .download-btn, #save-btn, #manual-print-btn {
+        display: none;
+      }
+      .tabs {
         display: none;
       }
     }
@@ -140,7 +143,7 @@
     .terms, .signature {
       font-size: 10px;
     }
-    .download-btn, #save-btn {
+    .download-btn, #save-btn, #manual-print-btn {
       display: block;
       width: 90%;
       max-width: 300px;
@@ -172,6 +175,7 @@
     <div id="invoice-pages"></div>
     <button id="download-btn" class="download-btn">Download Invoice PDF</button>
     <button id="save-btn" class="download-btn">Save Invoice</button>
+    <button id="manual-print-btn" class="download-btn" style="display: none;">Manual Print</button>
   </div>
 
   <script type="module">
@@ -191,6 +195,7 @@
     try {
       const app = initializeApp(firebaseConfig);
       db = getFirestore(app);
+      console.log('Firebase initialized successfully');
     } catch (error) {
       console.error('Error initializing Firebase:', error);
       alert('Failed to initialize Firebase. Please check your configuration.');
@@ -309,7 +314,7 @@
         tbody.appendChild(row);
         itemIndex++;
         if (item.subItems && item.subItems.length > 0) {
-          item.subItems.forEach((subItem) => {
+          item.subItems.forEach(subItem => {
             const subTaxableValue = parseFloat(subItem.taxableValue) || 0;
             const subSgstAmt = subTaxableValue * sgstRate / 100 || 0;
             const subCgstAmt = subTaxableValue * cgstRate / 100 || 0;
@@ -348,7 +353,7 @@
               <p><strong>Bank Details :</strong></p>
               <p>Beneficiary Name : TRIPZETTA</p>
               <p>Bank Name : YES BANK</p>
-              <p>Branch Name : EAST OF KAILASH , New Delhi-110065</p>
+              <p>Branch : EAST OF KAILASH , New Delhi</p>
               <p>IFSC CODE : YESB0000514</p>
               <p>Current Account No : 051463700000043</p>
             </div>
@@ -378,7 +383,7 @@
           <div style="width: 100%; border: 1px solid #000; border-top: none; display: flex; justify-content: flex-end; font-size: 10px; padding: 4px;">
             <div style="text-align: right;">
               <p>For TRIPZETTA</p>
-              <img src="sign.png" class="logo" alt="Tripzetta Logo">
+              <img src="sign.png" class="logo" alt="Tripzetta Signature">
               <p>Authorised Signatory</p>
             </div>
           </div>
@@ -389,7 +394,6 @@
 
     async function saveInvoice(invoiceId, invoiceData, totals) {
       try {
-        // Save to invoices collection (for dashboard)
         const invoiceDoc = {
           ...invoiceData,
           total: totals.roundedTotal || 0,
@@ -397,8 +401,6 @@
           timestamp: new Date()
         };
         await setDoc(doc(db, 'invoices', invoiceId), invoiceDoc);
-
-        // Save to saved_invoices (for tracking)
         const savedInvoice = {
           invoiceId,
           invoiceNo: invoiceData.invoiceNo || '',
@@ -409,7 +411,7 @@
           timestamp: new Date()
         };
         await addDoc(collection(db, 'saved_invoices'), savedInvoice);
-
+        console.log('Invoice saved successfully');
         alert('Invoice saved successfully.');
         window.location.href = 'index.html';
       } catch (error) {
@@ -419,124 +421,216 @@
     }
 
     async function loadInvoice(invoiceId) {
-      try {
-        const docRef = doc(db, 'invoices', invoiceId);
-        const docSnap = await getDoc(docRef);
-        if (!docSnap.exists()) {
-          alert('Invoice not found.');
-          return;
-        }
-        const invoiceData = docSnap.data();
-        const items = invoiceData.items || [];
-        let totalBeforeTax = 0;
-        let totalSGST = 0;
-        let totalCGST = 0;
-        let totalIGST = 0;
-        items.forEach(item => {
-          const taxableValue = parseFloat(item.taxableValue) || 0;
-          const sgstRate = parseFloat(item.sgstRate) || 0;
-          const cgstRate = parseFloat(item.cgstRate) || 0;
-          const igstRate = parseFloat(item.igstRate) || 0;
-          let sgstAmt = taxableValue * sgstRate / 100 || 0;
-          let cgstAmt = taxableValue * cgstRate / 100 || 0;
-          let igstAmt = taxableValue * igstRate / 100 || 0;
-          totalBeforeTax += taxableValue;
-          totalSGST += sgstAmt;
-          totalCGST += cgstAmt;
-          totalIGST += igstAmt;
-          if (item.subItems && item.subItems.length > 0) {
-            item.subItems.forEach(subItem => {
-              const subTaxableValue = parseFloat(subItem.taxableValue) || 0;
-              sgstAmt = subTaxableValue * sgstRate / 100 || 0;
-              cgstAmt = subTaxableValue * cgstRate / 100 || 0;
-              igstAmt = subTaxableValue * igstRate / 100 || 0;
-              totalBeforeTax += subTaxableValue;
+      return new Promise((resolve, reject) => {
+        try {
+          console.log(`Fetching invoice ${invoiceId}`);
+          const docRef = doc(db, 'invoices', invoiceId);
+          getDoc(docRef).then(docSnap => {
+            if (!docSnap.exists()) {
+              console.error('Invoice not found');
+              alert('Invoice not found.');
+              reject(false);
+              return;
+            }
+            const invoiceData = docSnap.data();
+            console.log('Invoice data loaded:', invoiceData);
+            const items = invoiceData.items || [];
+            let totalBeforeTax = 0;
+            let totalSGST = 0;
+            let totalCGST = 0;
+            let totalIGST = 0;
+            items.forEach(item => {
+              const taxableValue = parseFloat(item.taxableValue) || 0;
+              const sgstRate = parseFloat(item.sgstRate) || 0;
+              const cgstRate = parseFloat(item.cgstRate) || 0;
+              const igstRate = parseFloat(item.igstRate) || 0;
+              let sgstAmt = taxableValue * sgstRate / 100 || 0;
+              let cgstAmt = taxableValue * cgstRate / 100 || 0;
+              let igstAmt = taxableValue * igstRate / 100 || 0;
+              totalBeforeTax += taxableValue;
               totalSGST += sgstAmt;
               totalCGST += cgstAmt;
               totalIGST += igstAmt;
+              if (item.subItems && item.subItems.length > 0) {
+                item.subItems.forEach(subItem => {
+                  const subTaxableValue = parseFloat(subItem.taxableValue) || 0;
+                  sgstAmt = subTaxableValue * sgstRate / 100 || 0;
+                  cgstAmt = subTaxableValue * cgstRate / 100 || 0;
+                  igstAmt = subTaxableValue * igstRate / 100 || 0;
+                  totalBeforeTax += subTaxableValue;
+                  totalSGST += sgstAmt;
+                  totalCGST += cgstAmt;
+                  totalIGST += igstAmt;
+                });
+              }
             });
-          }
-        });
-        const grossTotal = totalBeforeTax + totalSGST + totalCGST + totalIGST;
-        const roundedTotal = Math.round(grossTotal);
-        const rounding = roundedTotal - grossTotal;
-        const totals = {
-          totalBeforeTax,
-          totalSGST,
-          totalCGST,
-          totalIGST,
-          rounding,
-          roundedTotal
-        };
-        const pagesContainer = document.getElementById('invoice-pages');
-        pagesContainer.innerHTML = '';
-        const maxContentHeight = 250;
-        let currentPage = 1;
-        let currentItemIndex = 0;
-        let currentHeight = 0;
-        const rowHeight = 5;
-        const headerHeight = 25;
-        const footerHeight = 25;
-        while (currentItemIndex < items.length) {
-          let itemsInPage = [];
-          currentHeight = headerHeight;
-          while (currentItemIndex < items.length && currentHeight + rowHeight <= maxContentHeight - footerHeight) {
-            itemsInPage.push(items[currentItemIndex]);
-            currentHeight += rowHeight;
-            if (items[currentItemIndex].subItems && items[currentItemIndex].subItems.length) {
-              currentHeight += items[currentItemIndex].subItems.length * rowHeight;
+            const grossTotal = totalBeforeTax + totalSGST + totalCGST + totalIGST;
+            const roundedTotal = Math.round(grossTotal);
+            const rounding = roundedTotal - grossTotal;
+            const totals = {
+              totalBeforeTax,
+              totalSGST,
+              totalCGST,
+              totalIGST,
+              rounding,
+              roundedTotal
+            };
+            const pagesContainer = document.getElementById('invoice-pages');
+            pagesContainer.innerHTML = '';
+            const maxContentHeight = 250;
+            let currentPage = 1;
+            let currentItemIndex = 0;
+            let currentHeight = 0;
+            const rowHeight = 5;
+            const headerHeight = 25;
+            const footerHeight = 25;
+            while (currentItemIndex < items.length) {
+              let itemsInPage = [];
+              currentHeight = headerHeight;
+              while (currentItemIndex < items.length && currentHeight + rowHeight <= maxContentHeight - footerHeight) {
+                itemsInPage.push(items[currentItemIndex]);
+                currentHeight += rowHeight;
+                if (items[currentItemIndex].subItems && items[currentItemIndex].subItems.length) {
+                  currentHeight += items[currentItemIndex].subItems.length * rowHeight;
+                }
+                currentItemIndex++;
+              }
+              const pageContent = createPageContent(currentPage, invoiceData, items, currentItemIndex - itemsInPage.length, currentItemIndex, totals);
+              pagesContainer.appendChild(pageContent);
+              currentPage++;
             }
-            currentItemIndex++;
-          }
-          const pageContent = createPageContent(currentPage, invoiceData, items, currentItemIndex - itemsInPage.length, currentItemIndex, totals);
-          pagesContainer.appendChild(pageContent);
-          currentPage++;
+            console.log(`Rendered ${currentPage - 1} page(s)`);
+            document.getElementById('save-btn').dataset.invoiceId = invoiceId;
+            document.getElementById('save-btn').dataset.invoiceData = JSON.stringify(invoiceData);
+            document.getElementById('save-btn').dataset.totals = JSON.stringify(totals);
+            resolve(true);
+          }).catch(error => {
+            console.error('Error loading invoice:', error);
+            alert('Failed to load invoice data.');
+            reject(error);
+          });
+        } catch (error) {
+          console.error('Error in loadInvoice:', error);
+          reject(error);
         }
-        document.getElementById('save-btn').dataset.invoiceId = invoiceId;
-        document.getElementById('save-btn').dataset.invoiceData = JSON.stringify(invoiceData);
-        document.getElementById('save-btn').dataset.totals = JSON.stringify(totals);
+      });
+    }
+
+    function triggerPrint() {
+      console.log('Triggering print dialog');
+      try {
+        window.print();
       } catch (error) {
-        console.error('Error loading invoice:', error);
-        alert('Failed to load invoice data.');
+        console.error('Error triggering print:', error);
+        alert('Failed to open print dialog. Please use the manual print button.');
+        document.getElementById('manual-print-btn').style.display = 'block';
       }
     }
 
-    document.getElementById('download-btn').addEventListener('click', async function() {
+    async function handleAutoPrint() {
+      console.log('Checking for auto-print');
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('print') !== 'true') {
+        console.log('No print parameter, skipping auto-print');
+        return;
+      }
       try {
+        const images = document.querySelectorAll('img');
+        const imagePromises = Array.from(images).map(img => {
+          return new Promise(resolve => {
+            if (img.complete) {
+              console.log(`Image ${img.src} already loaded`);
+              resolve();
+            } else {
+              img.addEventListener('load', () => {
+                console.log(`Image ${img.src} loaded`);
+                resolve();
+              }, { once: true });
+              img.addEventListener('error', () => {
+                console.log(`Error loading image ${img.src}`);
+                resolve();
+              }, { once: true });
+            }
+          });
+        });
+        console.log(`Waiting for ${imagePromises.length} images to load`);
+        await Promise.all(imagePromises);
+        console.log('All images loaded');
+        triggerPrint();
+        setTimeout(() => {
+          if (document.getElementById('invoice-pages').children.length > 0) {
+            console.log('Print dialog not confirmed, showing manual print button');
+            document.getElementById('manual-print-btn').style.display = 'block';
+          }
+        }, 5000);
+      } catch (error) {
+        console.error('Error in handleAutoPrint:', error);
+        alert('Failed to prepare for printing. Please use the manual print button.');
+        document.getElementById('manual-print-btn').style.display = 'block';
+      }
+    }
+
+    window.addEventListener('afterprint', () => {
+      console.log('Print dialog closed, redirecting to index.html');
+      window.location.href = 'index.html';
+    });
+
+    document.getElementById('download-btn').addEventListener('click', async () => {
+      try {
+        console.log('Generating PDF');
         const pages = document.getElementsByClassName('invoice-page');
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF('p', 'mm', 'a4');
         const pdfWidth = pdf.internal.pageSize.getWidth();
         const pdfHeight = pdf.internal.pageSize.getHeight();
         for (let i = 0; i < pages.length; i++) {
+          console.log(`Processing page ${i + 1}`);
           const canvas = await html2canvas(pages[i], { scale: 2 });
-          const imgData = canvas.toDataURL('image/png');
+          const imgData = canvas.toDataURL('image/jpeg', 1.0);
           if (i > 0) {
             pdf.addPage();
           }
-          pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+          pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
         }
         pdf.save('invoice.pdf');
+        console.log('PDF saved successfully');
       } catch (error) {
         console.error('Error generating PDF:', error);
         alert('Failed to generate PDF.');
       }
     });
 
-    document.getElementById('save-btn').addEventListener('click', async function() {
-      const invoiceId = this.dataset.invoiceId;
-      const invoiceData = JSON.parse(this.dataset.invoiceData);
-      const totals = JSON.parse(this.dataset.totals);
+    document.getElementById('save-btn').addEventListener('click', async () => {
+      const invoiceId = document.getElementById('save-btn').dataset.invoiceId;
+      const invoiceData = JSON.parse(document.getElementById('save-btn').dataset.invoiceData);
+      const totals = JSON.parse(document.getElementById('save-btn').dataset.totals);
       await saveInvoice(invoiceId, invoiceData, totals);
     });
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const invoiceId = urlParams.get('invoiceId');
-    if (invoiceId) {
-      loadInvoice(invoiceId);
-    } else {
-      alert('No invoice ID provided. Please create or select an invoice.');
-    }
+    document.getElementById('manual-print-btn').addEventListener('click', () => {
+      console.log('Manual print button clicked');
+      triggerPrint();
+    });
+
+    (async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const invoiceId = urlParams.get('invoiceId');
+      if (invoiceId) {
+        console.log('Starting invoice load for ID:', invoiceId);
+        try {
+          const loaded = await loadInvoice(invoiceId);
+          if (loaded) {
+            console.log('Invoice loaded, handling auto-print');
+            await handleAutoPrint();
+          }
+        } catch (error) {
+          console.error('Failed to load invoice:', error);
+        }
+      } else {
+        console.error('No invoice ID provided');
+        alert('No invoice ID provided. Please create or select an invoice.');
+      }
+    })();
   </script>
 </body>
 </html>
