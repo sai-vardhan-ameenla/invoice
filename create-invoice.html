@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Create Invoice</title>
+  <script type="module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"></script>
+  <script type="module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
+    }
+    .tabs {
+      display: flex;
+      justify-content: center;
+      margin: 20px 0;
+    }
+    .tab {
+      padding: 10px 20px;
+      cursor: pointer;
+      background: #ddd;
+      margin: 0 5px;
+      border-radius: 5px;
+      text-decoration: none;
+      color: black;
+    }
+    .tab.active {
+      background: #007bff;
+      color: white;
+    }
+    .invoice-form-container {
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      background: white;
+      border: 1px solid #ccc;
+    }
+    form {
+      width: 100%;
+      max-width: 794px;
+      min-width: 200px;
+      margin: 20px auto;
+      padding: 20px;
+      background: #fff;
+      border: 1px solid #ccc;
+    }
+    label {
+      display: block;
+      margin: 10px 0 5px;
+    }
+    input, textarea {
+      width: 100%;
+      max-width: 400px;
+      padding: 5px;
+      margin-bottom: 10px;
+    }
+    .form-btn, #preview-btn {
+      display: block;
+      width: 90%;
+      max-width: 300px;
+      margin: 10px auto;
+      padding: 10px;
+      font-size: 14px;
+      cursor: pointer;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+    }
+    #items-container .item {
+      margin-bottom: 20px;
+      padding: 10px;
+      border: 1px solid #ddd;
+    }
+    .sub-items-container {
+      margin-top: 10px;
+      padding-left: 20px;
+    }
+    .sub-item {
+      margin-bottom: 10px;
+      padding: 5px;
+      border: 1px solid #eee;
+    }
+    .remove-item, .remove-sub-item {
+      margin-top: 10px;
+      padding: 5px;
+      background: #ff4d4d;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    .add-sub-item {
+      margin-top: 5px;
+      padding: 5px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    @media screen and (max-width: 768px) {
+      .invoice-form-container {
+        padding: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="tabs">
+    <a class="tab" href="index.html">Back to Dashboard</a>
+    <div class="tab active" data-tab="create-invoice">Create Invoice</div>
+    <a class="tab" href="invoice.html">Purchase Records</a>
+    <a class="tab" href="invoice-preview.html">Invoice Preview</a>
+  </div>
+
+  <div class="invoice-form-container" id="create-invoice">
+    <h2 id="form-title">Create Invoice</h2>
+    <form id="invoice-form">
+      <label for="invoice-date">Invoice Date:</label>
+      <input type="date" id="invoice-date" name="invoice-date">
+      <label for="invoice-no">Invoice No:</label>
+      <input type="text" id="invoice-no" name="invoice-no">
+      <label for="place-of-supply">Place of Supply:</label>
+      <input type="text" id="place-of-supply" name="place-of-supply">
+      <label for="customer-name">Customer's Name:</label>
+      <input type="text" id="customer-name" name="customer-name">
+      <label for="customer-address">Customer's Address:</label>
+      <textarea id="customer-address" name="customer-address"></textarea>
+      <label for="customer-gstin">Customer's GSTIN:</label>
+      <input type="text" id="customer-gstin" name="customer-gstin">
+      <label for="customer-state">Customer's STATE:</label>
+      <input type="text" id="customer-state" name="customer-state">
+      <h3>Items</h3>
+      <div id="items-container">
+        <div class="item">
+          <label>Service Description:</label><textarea name="description[]"></textarea>
+          <label>SAC Code:</label><input type="text" name="sac-code[]">
+          <label>Tax Type:</label><input type="text" name="tax-type[]">
+          <label>Taxable Value:</label><input type="number" name="taxable-value[]" step="0.01">
+          <label>SGST %:</label><input type="number" name="sgst-rate[]" step="0.01">
+          <label>CGST %:</label><input type="number" name="cgst-rate[]" step="0.01">
+          <label>IGST %:</label><input type="number" name="igst-rate[]" step="0.01">
+          <div class="sub-items-container">
+            <h4>Sub-Services (Optional)</h4>
+            <div class="sub-item">
+              <label>Sub-Service Description:</label><textarea name="sub-description[]"></textarea>
+              <label>Sub-Service Taxable Value:</label><input type="number" name="sub-taxable-value[]" step="0.01">
+              <button type="button" class="remove-sub-item">Remove Sub-Service</button>
+            </div>
+          </div>
+          <button type="button" class="add-sub-item">Add Sub-Service</button>
+          <button type="button" class="remove-item">Remove Service</button>
+        </div>
+      </div>
+      <button type="button" id="add-item">Add Another Service</button>
+      <button type="button" id="preview-btn">Preview Invoice</button>
+    </form>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+    import { getFirestore, collection, addDoc, getDocs, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAT3oqplHoUuZrDNrnZbQ-hoUChLLEdmV4",
+      authDomain: "saas-restaurant-vardhan.firebaseapp.com",
+      projectId: "saas-restaurant-vardhan",
+      storageBucket: "saas-restaurant-vardhan.appspot.com",
+      messagingSenderId: "1019077493371",
+      appId: "1:1019077493371:web:2c92f2c902e34b05c358de"
+    };
+
+    let db;
+    try {
+      const app = initializeApp(firebaseConfig);
+      db = getFirestore(app);
+    } catch (error) {
+      console.error('Error initializing Firebase:', error);
+      alert('Failed to initialize Firebase. Please check your configuration.');
+    }
+
+    let editingInvoiceId = null;
+
+    async function generateInvoiceNumber() {
+      try {
+        const querySnapshot = await getDocs(collection(db, 'invoices'));
+        let maxNumber = 0;
+        querySnapshot.forEach(doc => {
+          const invoiceNo = doc.data().invoiceNo || '';
+          if (invoiceNo.startsWith('INV-')) {
+            const number = parseInt(invoiceNo.replace('INV-', '')) || 0;
+            if (number > maxNumber) maxNumber = number;
+          }
+        });
+        const nextNumber = maxNumber + 1;
+        return `INV-${nextNumber.toString().padStart(4, '0')}`;
+      } catch (error) {
+        console.error('Error generating invoice number:', error);
+        alert('Error generating invoice number.');
+        return 'INV-0001';
+      }
+    }
+
+    async function isInvoiceNumberUnique(invoiceNo, currentInvoiceId = null) {
+      try {
+        const querySnapshot = await getDocs(collection(db, 'invoices'));
+        for (const doc of querySnapshot.docs) {
+          if (doc.data().invoiceNo === invoiceNo && doc.id !== currentInvoiceId) {
+            return false;
+          }
+        }
+        return true;
+      } catch (error) {
+        console.error('Error checking invoice number uniqueness:', error);
+        alert('Failed to validate invoice number.');
+        return false;
+      }
+    }
+
+    async function resetInvoiceForm() {
+      const form = document.getElementById('invoice-form');
+      form.reset();
+      document.getElementById('form-title').innerText = 'Create Invoice';
+      editingInvoiceId = null;
+      const itemsContainer = document.getElementById('items-container');
+      itemsContainer.innerHTML = `
+        <div class="item">
+          <label>Service Description:</label><textarea name="description[]"></textarea>
+          <label>SAC Code:</label><input type="text" name="sac-code[]">
+          <label>Tax Type:</label><input type="text" name="tax-type[]">
+          <label>Taxable Value:</label><input type="number" name="taxable-value[]" step="0.01">
+          <label>SGST %:</label><input type="number" name="sgst-rate[]" step="0.01">
+          <label>CGST %:</label><input type="number" name="cgst-rate[]" step="0.01">
+          <label>IGST %:</label><input type="number" name="igst-rate[]" step="0.01">
+          <div class="sub-items-container">
+            <h4>Sub-Services (Optional)</h4>
+            <div class="sub-item">
+              <label>Sub-Service Description:</label><textarea name="sub-description[]"></textarea>
+              <label>Sub-Service Taxable Value:</label><input type="number" name="sub-taxable-value[]" step="0.01">
+              <button type="button" class="remove-sub-item">Remove Sub-Service</button>
+            </div>
+          </div>
+          <button type="button" class="add-sub-item">Add Sub-Service</button>
+          <button type="button" class="remove-item">Remove Service</button>
+        </div>
+      `;
+      const invoiceNo = await generateInvoiceNumber();
+      document.getElementById('invoice-no').value = invoiceNo;
+    }
+
+    async function editInvoice(invoiceId) {
+      try {
+        const docRef = doc(db, 'invoices', invoiceId);
+        const docSnap = await getDoc(docRef);
+        if (!docSnap.exists()) {
+          alert('Invoice not found.');
+          return;
+        }
+        const invoiceData = docSnap.data();
+        if (invoiceData.status === 'canceled') {
+          alert('Cannot edit a canceled invoice.');
+          return;
+        }
+        editingInvoiceId = invoiceId;
+        document.getElementById('form-title').innerText = 'Edit Invoice Details';
+        const form = document.getElementById('invoice-form');
+        form['invoice-date'].value = invoiceData.date || '';
+        form['invoice-no'].value = invoiceData.invoiceNo || '';
+        form['place-of-supply'].value = invoiceData.placeOfSupply || '';
+        form['customer-name'].value = invoiceData.customerName || '';
+        form['customer-address'].value = invoiceData.customerAddress || '';
+        form['customer-gstin'].value = invoiceData.customerGSTIN || '';
+        form['customer-state'].value = invoiceData.customerState || '';
+        const itemsContainer = document.getElementById('items-container');
+        itemsContainer.innerHTML = '';
+        invoiceData.items.forEach((item, index) => {
+          const itemDiv = document.createElement('div');
+          itemDiv.className = 'item';
+          itemDiv.innerHTML = `
+            <label>Service Description:</label><textarea name="description[]">${item.description || ''}</textarea>
+            <label>SAC Code:</label><input type="text" name="sac-code[]" value="${item.sacCode || ''}">
+            <label>Tax Type:</label><input type="text" name="tax-type[]" value="${item.taxType || ''}">
+            <label>Taxable Value:</label><input type="number" name="taxable-value[]" step="0.01" value="${item.taxableValue || ''}">
+            <label>SGST %:</label><input type="number" name="sgst-rate[]" step="0.01" value="${item.sgstRate || ''}">
+            <label>CGST %:</label><input type="number" name="cgst-rate[]" step="0.01" value="${item.cgstRate || ''}">
+            <label>IGST %:</label><input type="number" name="igst-rate[]" step="0.01" value="${item.igstRate || ''}">
+            <div class="sub-items-container">
+              <h4>Sub-Services (Optional)</h4>
+              ${item.subItems && item.subItems.length > 0 ? item.subItems.map(subItem => `
+                <div class="sub-item">
+                  <label>Sub-Service Description:</label><textarea name="sub-description[]">${subItem.description || ''}</textarea>
+                  <label>Sub-Service Taxable Value:</label><input type="number" name="sub-taxable-value[]" step="0.01" value="${subItem.taxableValue || ''}">
+                  <button type="button" class="remove-sub-item">Remove Sub-Service</button>
+                </div>
+              `).join('') : `
+                <div class="sub-item">
+                  <label>Sub-Service Description:</label><textarea name="sub-description[]"></textarea>
+                  <label>Sub-Service Taxable Value:</label><input type="number" name="sub-taxable-value[]" step="0.01">
+                  <button type="button" class="remove-sub-item">Remove Sub-Service</button>
+                </div>
+              `}
+            </div>
+            <button type="button" class="add-sub-item">Add Sub-Service</button>
+            <button type="button" class="remove-item">Remove Service</button>
+          `;
+          itemsContainer.appendChild(itemDiv);
+        });
+      } catch (error) {
+        console.error('Error fetching invoice:', error);
+        alert('Failed to load invoice data.');
+      }
+    }
+
+    async function saveInvoice(invoiceData) {
+      try {
+        const isUnique = await isInvoiceNumberUnique(invoiceData.invoiceNo, editingInvoiceId);
+        if (!isUnique) {
+          alert('Invoice number already exists. Please use a unique invoice number.');
+          return null;
+        }
+        invoiceData.status = 'active';
+        let invoiceId;
+        if (editingInvoiceId) {
+          await setDoc(doc(db, 'invoices', editingInvoiceId), invoiceData, { merge: true });
+          invoiceId = editingInvoiceId;
+          editingInvoiceId = null;
+          document.getElementById('form-title').innerText = 'Create Invoice';
+        } else {
+          const docRef = await addDoc(collection(db, 'invoices'), invoiceData);
+          invoiceId = docRef.id;
+        }
+        return invoiceId;
+      } catch (error) {
+        console.error('Error saving invoice:', error);
+        alert('Failed to save invoice.');
+        return null;
+      }
+    }
+
+    document.getElementById('add-item').addEventListener('click', function() {
+      const itemsContainer = document.getElementById('items-container');
+      const newItem = itemsContainer.firstElementChild.cloneNode(true);
+      newItem.querySelectorAll('input, textarea').forEach(input => input.value = '');
+      newItem.querySelector('.sub-items-container').innerHTML = `
+        <h4>Sub-Services (Optional)</h4>
+        <div class="sub-item">
+          <label>Sub-Service Description:</label><textarea name="sub-description[]"></textarea>
+          <label>Sub-Service Taxable Value:</label><input type="number" name="sub-taxable-value[]" step="0.01">
+          <button type="button" class="remove-sub-item">Remove Sub-Service</button>
+        </div>
+      `;
+      itemsContainer.appendChild(newItem);
+    });
+
+    document.getElementById('items-container').addEventListener('click', function(e) {
+      if (e.target.classList.contains('remove-item')) {
+        const item = e.target.closest('.item');
+        const items = document.querySelectorAll('#items-container .item');
+        if (items.length > 1) {
+          item.remove();
+        } else {
+          alert('At least one item is required.');
+        }
+      } else if (e.target.classList.contains('add-sub-item')) {
+        const subItemsContainer = e.target.previousElementSibling;
+        const newSubItem = subItemsContainer.querySelector('.sub-item').cloneNode(true);
+        newSubItem.querySelectorAll('input, textarea').forEach(input => input.value = '');
+        subItemsContainer.appendChild(newSubItem);
+      } else if (e.target.classList.contains('remove-sub-item')) {
+        const subItem = e.target.closest('.sub-item');
+        const subItems = subItem.parentElement.querySelectorAll('.sub-item');
+        if (subItems.length > 1) {
+          subItem.remove();
+        } else {
+          alert('At least one sub-service is required if you have sub-items.');
+        }
+      }
+    });
+
+    document.getElementById('preview-btn').addEventListener('click', async function () {
+      const form = document.getElementById('invoice-form');
+      const items = document.querySelectorAll('#items-container .item');
+      const invoiceItems = [];
+      let totalBeforeTax = 0;
+      let totalSGST = 0;
+      let totalCGST = 0;
+      let totalIGST = 0;
+      items.forEach((item) => {
+        const description = item.querySelector('[name="description[]"]').value || '';
+        const sac = item.querySelector('[name="sac-code[]"]').value || '';
+        const taxType = item.querySelector('[name="tax-type[]"]').value || '';
+        const taxableValue = parseFloat(item.querySelector('[name="taxable-value[]"]').value) || 0;
+        const sgstRate = parseFloat(item.querySelector('[name="sgst-rate[]"]').value) || 0;
+        const cgstRate = parseFloat(item.querySelector('[name="cgst-rate[]"]').value) || 0;
+        const igstRate = parseFloat(item.querySelector('[name="igst-rate[]"]').value) || 0;
+        let sgstAmt = taxableValue * sgstRate / 100 || 0;
+        let cgstAmt = taxableValue * cgstRate / 100 || 0;
+        let igstAmt = taxableValue * igstRate / 100 || 0;
+        totalBeforeTax += taxableValue;
+        totalSGST += sgstAmt;
+        totalCGST += cgstAmt;
+        totalIGST += igstAmt;
+        const subItems = item.querySelectorAll('.sub-item');
+        const subItemsData = [];
+        subItems.forEach((subItem) => {
+          const subDescription = subItem.querySelector('[name="sub-description[]"]').value || '';
+          const subTaxableValue = parseFloat(subItem.querySelector('[name="sub-taxable-value[]"]').value) || 0;
+          if (subDescription || subTaxableValue) {
+            sgstAmt = subTaxableValue * sgstRate / 100 || 0;
+            cgstAmt = subTaxableValue * cgstRate / 100 || 0;
+            igstAmt = subTaxableValue * igstRate / 100 || 0;
+            totalBeforeTax += subTaxableValue;
+            totalSGST += sgstAmt;
+            totalCGST += cgstAmt;
+            totalIGST += igstAmt;
+            subItemsData.push({
+              description: subDescription,
+              taxableValue: subTaxableValue
+            });
+          }
+        });
+        invoiceItems.push({
+          description,
+          sacCode: sac,
+          taxType,
+          taxableValue,
+          sgstRate,
+          cgstRate,
+          igstRate,
+          subItems: subItemsData
+        });
+      });
+      const grossTotal = totalBeforeTax + totalSGST + totalCGST + totalIGST;
+      const roundedTotal = Math.round(grossTotal);
+      const invoiceData = {
+        date: form['invoice-date'].value,
+        invoiceNo: form['invoice-no'].value,
+        placeOfSupply: form['place-of-supply'].value,
+        customerName: form['customer-name'].value,
+        customerAddress: form['customer-address'].value,
+        customerGSTIN: form['customer-gstin'].value,
+        customerState: form['customer-state'].value,
+        items: invoiceItems,
+        total: roundedTotal
+      };
+      const invoiceId = await saveInvoice(invoiceData);
+      if (invoiceId) {
+        await resetInvoiceForm();
+        window.location.href = `invoice-preview.html?invoiceId=${invoiceId}`;
+      }
+    });
+
+    // Check for invoiceId in URL for editing
+    const urlParams = new URLSearchParams(window.location.search);
+    const invoiceId = urlParams.get('invoiceId');
+    if (invoiceId) {
+      editInvoice(invoiceId);
+    } else {
+      resetInvoiceForm();
+    }
+  </script>
+</body>
+</html>

@@ -4,10 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>Invoice Generator with Dashboard</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <!-- Firebase SDK Scripts -->
+  <title>Invoice Generator Dashboard</title>
   <script type="module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"></script>
   <script type="module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js"></script>
   <style>
@@ -31,12 +28,14 @@
       background: #ddd;
       margin: 0 5px;
       border-radius: 5px;
+      text-decoration: none;
+      color: black;
     }
     .tab.active {
       background: #007bff;
       color: white;
     }
-    .dashboard, .invoice-form-container, .invoice-preview, .purchase-form-container {
+    .dashboard {
       width: 100%;
       max-width: 1200px;
       margin: 0 auto;
@@ -74,6 +73,13 @@
     .search-container #clear-search-btn {
       background: #ff4d4d;
     }
+    .filter-container {
+      margin-bottom: 15px;
+    }
+    .filter-container select, .filter-container input {
+      padding: 5px;
+      margin-right: 10px;
+    }
     .stats {
       display: flex;
       flex-wrap: wrap;
@@ -103,22 +109,22 @@
       border-radius: 5px;
       cursor: pointer;
     }
-    .invoice-list, .purchase-list {
+    .invoice-list {
       margin-top: 20px;
     }
-    .invoice-list table, .purchase-list table {
+    .invoice-list table {
       width: 100%;
       border-collapse: collapse;
     }
-    .invoice-list th, .invoice-list td, .purchase-list th, .purchase-list td {
+    .invoice-list th, .invoice-list td {
       border: 1px solid #ddd;
       padding: 8px;
       text-align: left;
     }
-    .invoice-list th, .purchase-list th {
+    .invoice-list th {
       background-color: #f2f2f2;
     }
-    .cancel-btn, .edit-btn {
+    .action-btn, .cancel-btn, .edit-btn {
       padding: 5px 10px;
       color: white;
       border: none;
@@ -126,209 +132,25 @@
       cursor: pointer;
       margin-right: 5px;
     }
-    .cancel-btn {
-      background: #ff8c00;
-    }
-    .edit-btn {
-      background: #4CAF50;
-    }
-    .canceled-row {
-      color: #888;
-    }
-    .invoice-page {
-      width: 210mm;
-      height: 297mm;
-      margin: 0 auto;
-      background: white;
-      padding: 10mm;
-      border: 1px solid #000;
-      box-sizing: border-box;
-    }
-    @media print {
-      @page {
-        size: A4;
-        margin: 0;
-      }
-      body * {
-        visibility: hidden;
-      }
-      #invoice, #invoice * {
-        visibility: visible;
-      }
-      #invoice {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 210mm;
-        height: 297mm;
-        margin: 0;
-        padding: 10mm;
-        box-sizing: border-box;
-        transform-origin: top left;
-      }
-      .download-btn, #preview-btn, #print-btn, form {
-        display: none;
-      }
-    }
+    .action-btn { background: #007bff; }
+    .cancel-btn { background: #ff8c00; }
+    .edit-btn { background: #4CAF50; }
+    .canceled-row { color: #888; }
     @media screen and (max-width: 768px) {
-      .invoice-page {
-        width: 210mm;
-        height: 297mm;
-        padding: 10mm;
-        font-size: 10px;
-        overflow: auto;
-      }
-      .dashboard, .invoice-form-container, .purchase-form-container {
-        padding: 10px;
-      }
-      table {
-        font-size: 8px;
-      }
-      .stat-box {
-        width: 48%;
-      }
-      .search-container input {
-        width: 150px;
-      }
-      .header, .bank-section {
-        flex-direction: column;
-        align-items: flex-start;
-      }
-      .right-info {
-        text-align: left;
-        margin-top: 10px;
-      }
-    }
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      flex-wrap: wrap;
-    }
-    .logo {
-      height: 40px;
-    }
-    .title {
-      font-size: 20px;
-      font-weight: bold;
-      margin-bottom: 10px;
-    }
-    .section {
-      font-size: 12px;
-      margin-bottom: 10px;
-    }
-    .bold {
-      font-weight: bold;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 10px;
-    }
-    th, td {
-      border: 1px solid #000;
-      padding: 4px;
-      text-align: left;
-    }
-    .bank-section {
-      width: 100%;
-      display: flex;
-      flex-direction: row;
-      flex-wrap: wrap;
-      font-size: 10px;
-      margin-top: 15px;
-    }
-    .terms, .signature {
-      font-size: 10px;
-    }
-    .download-btn, #preview-btn, #print-btn, .form-btn {
-      display: block;
-      width: 90%;
-      max-width: 300px;
-      margin: 10px auto;
-      padding: 10px;
-      font-size: 14px;
-      cursor: pointer;
-      background: #007bff;
-      color: white;
-      border: none;
-      border-radius: 5px;
-    }
-    #reset-purchase-btn {
-      background: #ff4d4d;
-    }
-    .right-info {
-      font-size: 10px;
-      text-align: right;
-      margin-top: 5px;
-    }
-    form {
-      width: 100%;
-      max-width: 794px;
-      min-width: 200px;
-      margin: 20px auto;
-      padding: 20px;
-      background: #fff;
-      border: 1px solid #ccc;
-    }
-    label {
-      display: block;
-      margin: 10px 0 5px;
-    }
-    input, textarea {
-      width: 100%;
-      max-width: 400px;
-      padding: 5px;
-      margin-bottom: 10px;
-    }
-    input[type="radio"] {
-      width: auto;
-      margin-right: 10px;
-    }
-    .radio-group {
-      margin: 10px 0;
-    }
-    #payment-method {
-      display: none;
-    }
-    #items-container .item {
-      margin-bottom: 20px;
-      padding: 10px;
-      border: 1px solid #ddd;
-    }
-    .sub-items-container {
-      margin-top: 10px;
-      padding-left: 20px;
-    }
-    .sub-item {
-      margin-bottom: 10px;
-      padding: 5px;
-      border: 1px solid #eee;
-    }
-    .remove-item, .remove-sub-item {
-      margin-top: 10px;
-      padding: 5px;
-      background: #ff4d4d;
-      color: white;
-      border: none;
-      cursor: pointer;
-    }
-    .add-sub-item {
-      margin-top: 5px;
-      padding: 5px;
-      background: #4CAF50;
-      color: white;
-      border: none;
-      cursor: pointer;
+      .dashboard { padding: 10px; }
+      .stat-box { width: 48%; }
+      .search-container input { width: 150px; }
+      .filter-container select, .filter-container input { width: 100px; }
+      table { font-size: 8px; }
     }
   </style>
 </head>
 <body>
   <div class="tabs">
     <div class="tab active" data-tab="services">Dashboard</div>
-    <div class="tab" data-tab="purchases">Purchase Records</div>
-    <div class="tab" data-tab="create-invoice">Create Invoice</div>
-    <div class="tab" data-tab="invoice-btn">Invoice Preview</div>
+    <a class="tab" href="invoice.html">Purchase Records</a>
+    <a class="tab" href="create-invoice.html">Create Invoice</a>
+    <a class="tab" href="invoice-preview.html">Invoice Preview</a>
   </div>
 
   <div class="dashboard" id="services">
@@ -408,6 +230,33 @@
         <p id="pending-yearly">0</p>
       </div>
     </div>
+    <div class="filter-container">
+      <select id="filter-day">
+        <option value="">All Days</option>
+        <!-- Days will be populated dynamically -->
+      </select>
+      <select id="filter-month">
+        <option value="">All Months</option>
+        <option value="1">January</option>
+        <option value="2">February</option>
+        <option value="3">March</option>
+        <option value="4">April</option>
+        <option value="5">May</option>
+        <option value="6">June</option>
+        <option value="7">July</option>
+        <option value="8">August</option>
+        <option value="9">September</option>
+        <option value="10">October</option>
+        <option value="11">November</option>
+        <option value="12">December</option>
+      </select>
+      <select id="filter-year">
+        <option value="">All Years</option>
+        <!-- Years will be populated dynamically -->
+      </select>
+      <button id="apply-filter-btn">Apply Filter</button>
+      <button id="clear-filter-btn">Clear Filters</button>
+    </div>
     <h3>Invoice List</h3>
     <div class="invoice-list">
       <table>
@@ -427,202 +276,12 @@
     <button class="download-report-btn" onclick="downloadReport()">Download Report</button>
   </div>
 
-  <div class="purchase-form-container" id="purchases" style="display: none;">
-    <h2>Purchase Records</h2>
-    <form id="purchase-form">
-      <label for="purchase-date">Purchase Date:</label>
-      <input type="date" id="purchase-date" name="purchase-date" required>
-      <label>Payment Type:</label>
-      <div class="radio-group">
-        <input type="radio" id="payment-credit" name="payment-type" value="credit" required>
-        <label for="payment-credit">Credit</label>
-        <input type="radio" id="payment-cash" name="payment-type" value="cash">
-        <label for="payment-cash">Cash</label>
-      </div>
-      <label for="payment-method" id="payment-method-label">Payment Method (if Cash):</label>
-      <input type="text" id="payment-method" name="payment-method" placeholder="e.g., UPI, Card">
-      <label for="passenger-names">Passenger Names:</label>
-      <textarea id="passenger-names" name="passenger-names" required></textarea>
-      <label for="hotel-booked">Hotel Booked:</label>
-      <input type="text" id="hotel-booked" name="hotel-booked" required>
-      <label for="service-description">Service Description:</label>
-      <textarea id="service-description" name="service-description" required></textarea>
-      <label for="commission">Commission (INR):</label>
-      <input type="number" id="commission" name="commission" step="0.01" required>
-      <label for="tds">TDS (INR):</label>
-      <input type="number" id="tds" name="tds" step="0.01" required>
-      <label for="gross-amount">Gross Amount (INR):</label>
-      <input type="number" id="gross-amount" name="gross-amount" step="0.01" required>
-      <label for="net-amount">Net Amount (INR):</label>
-      <input type="number" id="net-amount" name="net-amount" step="0.01" readonly>
-      <button type="button" class="form-btn" id="save-purchase-btn">Save Purchase</button>
-      <button type="button" class="form-btn" id="reset-purchase-btn">Reset Form</button>
-    </form>
-    <h3>Purchase List</h3>
-    <div class="purchase-list">
-      <table>
-        <thead>
-          <tr>
-            <th>Purchase ID</th>
-            <th>Date</th>
-            <th>Payment Type</th>
-            <th>Payment Method</th>
-            <th>Passengers</th>
-            <th>Hotel</th>
-            <th>Service</th>
-            <th>Commission</th>
-            <th>TDS</th>
-            <th>Gross</th>
-            <th>Net</th>
-          </tr>
-        </thead>
-        <tbody id="purchase-list-body"></tbody>
-      </table>
-    </div>
-  </div>
-
-  <div class="invoice-form-container" id="create-invoice" style="display: none;">
-    <h2 id="form-title">Create Invoice</h2>
-    <form id="invoice-form">
-      <label for="invoice-date">Invoice Date:</label>
-      <input type="date" id="invoice-date" name="invoice-date">
-      <label for="invoice-no">Invoice No:</label>
-      <input type="text" id="invoice-no" name="invoice-no">
-      <label for="place-of-supply">Place of Supply:</label>
-      <input type="text" id="place-of-supply" name="place-of-supply">
-      <label for="customer-name">Customer's Name:</label>
-      <input type="text" id="customer-name" name="customer-name">
-      <label for="customer-address">Customer's Address:</label>
-      <textarea id="customer-address" name="customer-address"></textarea>
-      <label for="customer-gstin">Customer's GSTIN:</label>
-      <input type="text" id="customer-gstin" name="customer-gstin">
-      <label for="customer-state">Customer's STATE:</label>
-      <input type="text" id="customer-state" name="customer-state">
-      <h3>Items</h3>
-      <div id="items-container">
-        <div class="item">
-          <label>Service Description:</label><textarea name="description[]"></textarea>
-          <label>SAC Code:</label><input type="text" name="sac-code[]">
-          <label>Tax Type:</label><input type="text" name="tax-type[]">
-          <label>Taxable Value:</label><input type="number" name="taxable-value[]" step="0.01">
-          <label>SGST %:</label><input type="number" name="sgst-rate[]" step="0.01">
-          <label>CGST %:</label><input type="number" name="cgst-rate[]" step="0.01">
-          <label>IGST %:</label><input type="number" name="igst-rate[]" step="0.01">
-          <div class="sub-items-container">
-            <h4>Sub-Services (Optional)</h4>
-            <div class="sub-item">
-              <label>Sub-Service Description:</label><textarea name="sub-description[]"></textarea>
-              <label>Sub-Service Taxable Value:</label><input type="number" name="sub-taxable-value[]" step="0.01">
-              <button type="button" class="remove-sub-item">Remove Sub-Service</button>
-            </div>
-          </div>
-          <button type="button" class="add-sub-item">Add Sub-Service</button>
-          <button type="button" class="remove-item">Remove Service</button>
-        </div>
-      </div>
-      <button type="button" id="add-item">Add Another Service</button>
-      <button type="button" id="preview-btn">Preview Invoice</button>
-    </form>
-  </div>
-
-  <div class="invoice-preview" id="invoice-btn" style="display: none;">
-    <div class="invoice-page" id="invoice">
-      <div class="header">
-        <div>
-          <p class="title">TAX INVOICE</p>
-          <div class="section">
-            <p><span class="bold">Invoice Date :</span> <span id="inv-date"></span></p>
-            <p><span class="bold">Invoice No :</span> <span id="inv-no"></span></p>
-            <p><span class="bold">Place of Supply :</span> <span id="supply-place"></span></p>
-          </div>
-          <div class="section">
-            <p><span class="bold">Name :</span> <span id="cust-name"></span></p>
-            <p><span class="bold">Address :</span> <span id="cust-address"></span></p>
-            <p><span class="bold">GSTIN :</span> <span id="cust-gstin"></span></p>
-            <p><span class="bold">STATE :</span> <span id="cust-state"></span></p>
-          </div>
-        </div>
-        <div style="text-align: right;">
-          <img src="image.png" class="logo" alt="Tripzetta Logo">
-          <div class="right-info">
-            <p><strong>GSTIN :</strong> 07APDPA8620A1ZL</p>
-            <p><strong>PAN :</strong> APDPA8620A</p>
-            <p><strong>Regd. Address :</strong> 408 4th Floor Devika Tower Nehru Place New Delhi</p>
-            <p><strong>Contact:</strong> +919650485130</p>
-          </div>
-        </div>
-      </div>
-      <table id="invoice-table">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Service Description</th>
-            <th>SAC Code</th>
-            <th>Tax Type</th>
-            <th>Taxable Value</th>
-            <th>SGST%</th>
-            <th>SGST Amount</th>
-            <th>CGST%</th>
-            <th>CGST Amount</th>
-            <th>IGST%</th>
-            <th>IGST Amount</th>
-            <th>Total (INR)</th>
-          </tr>
-        </thead>
-        <tbody id="invoice-table-body"></tbody>
-      </table>
-      <div class="bank-section">
-        <div style="width: 60%; border: 1px solid #000; padding: 5px; font-size: 10px;">
-          <p><strong>Bank Details :</strong></p>
-          <p>Beneficiary Name : TRIPZETTA</p>
-          <p>Bank Name : YES BANK</p>
-          <p>Branch Name : EAST OF KAILASH , New Delhi-110065</p>
-          <p>IFSC CODE : YESB0000514</p>
-          <p>Current Account No : 051463700000043</p>
-        </div>
-        <div style="width: 40%; border: 1px solid #000; border-left: none; font-size: 10px;">
-          <table style="width:100%; border-collapse: collapse;">
-            <tr><td style="border: 1px solid #000; padding: 4px;">Total Amount Before Tax</td><td style="border: 1px solid #000; padding: 4px;" id="total-before-tax">0.00</td></tr>
-            <tr><td style="border: 1px solid #000; padding: 4px;">Add : SGST @ 9%</td><td style="border: 1px solid #000; padding: 4px;" id="sgst-amount">0.00</td></tr>
-            <tr><td style="border: 1px solid #000; padding: 4px;">Add : CGST @ 9%</td><td style="border: 1px solid #000; padding: 4px;" id="cgst-amount">0.00</td></tr>
-            <tr><td style="border: 1px solid #000; padding: 4px;">Add : IGST @ 18%</td><td style="border: 1px solid #000; padding: 4px;" id="igst-amount">0.00</td></tr>
-            <tr><td style="border: 1px solid #000; padding: 4px;">Rounding</td><td style="border: 1px solid #000; padding: 4px;" id="rounding">0.00</td></tr>
-            <tr><td style="border: 1px solid #000; padding: 4px;"><strong>Total Invoice Value</strong></td><td style="border: 1px solid #000; padding: 4px;" id="total-invoice-value-table">0.00</td></tr>
-          </table>
-        </div>
-      </div>
-      <div style="width: 100%; border: 1px solid #000; border-top: none; font-size: 10px; padding: 4px;">
-        <strong>Total Invoice Value ( In Words ) :</strong> <span id="total-in-words">Zero Rupees Only</span>
-      </div>
-      <div style="width: 100%; border: 1px solid #000; border-top: none; font-size: 10px; padding: 4px;">
-        <p><strong>Terms & Conditions :</strong></p>
-        <ul style="margin: 4px 0 4px 15px; padding-left: 0;">
-          <li>CHEQUE/NEFT/RTGS should be in favour of TRIPZETTA</li>
-          <li>Any refunds or claims are subject to the cancellation policy of the booking as per rules.</li>
-          <li>All disputes are subject to jurisdiction of Delhi courts.</li>
-          <li>Interest @ 18% p.a. will be charged on overdue bills.</li>
-        </ul>
-      </div>
-      <div style="width: 100%; border: 1px solid #000; border-top: none; display: flex; justify-content: flex-end; font-size: 10px; padding: 4px;">
-        <div style="text-align: right;">
-          <p>For TRIPZETTA</p>
-          <img src="sign.png" class="logo" alt="Tripzetta Logo">
-          <p>Authorised Signatory</p>
-        </div>
-      </div>
-    </div>
-    <button id="download-btn" class="download-btn">Download Invoice PDF</button>
-    <button id="print-btn" class="download-btn">Print Invoice</button>
-  </div>
-
   <script type="module">
-    // Import Firebase modules
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-    import { getFirestore, collection, addDoc, getDocs, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+    import { getFirestore, collection, getDocs, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
-    // Firebase configuration
     const firebaseConfig = {
-      apiKey: "AIzaSyAT3oqplHoUuZrDNrnZbQ-hoUChLLEdmV4",
+      apiKey: "AIzaSyAT3oqplHoUuZrDNpnZbQ-hoUChLLEdmV4",
       authDomain: "saas-restaurant-vardhan.firebaseapp.com",
       projectId: "saas-restaurant-vardhan",
       storageBucket: "saas-restaurant-vardhan.appspot.com",
@@ -630,7 +289,6 @@
       appId: "1:1019077493371:web:2c92f2c902e34b05c358de"
     };
 
-    // Initialize Firebase
     let db;
     try {
       const app = initializeApp(firebaseConfig);
@@ -640,230 +298,38 @@
       alert('Failed to initialize Firebase. Please check your configuration.');
     }
 
-    // Variable to track editing invoice
-    let editingInvoiceId = null;
-
-    // Generate unique invoice number
-    async function generateInvoiceNumber() {
-      try {
-        const querySnapshot = await getDocs(collection(db, 'invoices'));
-        let maxNumber = 0;
-        querySnapshot.forEach(doc => {
-          const invoiceNo = doc.data().invoiceNo || '';
-          if (invoiceNo.startsWith('INV-')) {
-            const number = parseInt(invoiceNo.replace('INV-', '')) || 0;
-            if (number > maxNumber) maxNumber = number;
-          }
-        });
-        const nextNumber = maxNumber + 1;
-        return `INV-${nextNumber.toString().padStart(4, '0')}`;
-      } catch (error) {
-        console.error('Error generating invoice number:', error);
-        alert('Error generating invoice number.');
-        return 'INV-0001';
-      }
-    }
-
-    // Check if invoice number is unique
-    async function isInvoiceNumberUnique(invoiceNo, currentInvoiceId = null) {
-      try {
-        const querySnapshot = await getDocs(collection(db, 'invoices'));
-        for (const doc of querySnapshot.docs) {
-          if (doc.data().invoiceNo === invoiceNo && doc.id !== currentInvoiceId) {
-            return false;
-          }
-        }
-        return true;
-      } catch (error) {
-        console.error('Error checking invoice number uniqueness:', error);
-        alert('Failed to validate invoice number.');
-        return false;
-      }
-    }
-
-    // Generate unique purchase ID
-    async function generatePurchaseId() {
-      try {
-        const querySnapshot = await getDocs(collection(db, 'purchases'));
-        let maxNumber = 0;
-        querySnapshot.forEach(doc => {
-          const purchaseId = doc.data().purchaseId || '';
-          if (purchaseId.startsWith('PUR-')) {
-            const number = parseInt(purchaseId.replace('PUR-', '')) || 0;
-            if (number > maxNumber) maxNumber = number;
-          }
-        });
-        const nextNumber = maxNumber + 1;
-        return `PUR-${nextNumber.toString().padStart(4, '0')}`;
-      } catch (error) {
-        console.error('Error generating purchase ID:', error);
-        alert('Error generating purchase ID.');
-        return 'PUR-0001';
-      }
-    }
-
-    // Reset purchase form
-    async function resetPurchaseForm() {
-      const form = document.getElementById('purchase-form');
-      form.reset();
-      document.getElementById('payment-method').style.display = 'none';
-      document.getElementById('payment-method-label').style.display = 'none';
-      document.getElementById('net-amount').value = '';
-      document.getElementById('payment-credit').checked = false;
-      document.getElementById('payment-cash').checked = false;
-    }
-
-    // Reset invoice form
-    async function resetInvoiceForm() {
-      const form = document.getElementById('invoice-form');
-      form.reset();
-      document.getElementById('form-title').innerText = 'Create Invoice';
-      editingInvoiceId = null;
-      const itemsContainer = document.getElementById('items-container');
-      itemsContainer.innerHTML = `
-        <div class="item">
-          <label>Service Description:</label><textarea name="description[]"></textarea>
-          <label>SAC Code:</label><input type="text" name="sac-code[]">
-          <label>Tax Type:</label><input type="text" name="tax-type[]">
-          <label>Taxable Value:</label><input type="number" name="taxable-value[]" step="0.01">
-          <label>SGST %:</label><input type="number" name="sgst-rate[]" step="0.01">
-          <label>CGST %:</label><input type="number" name="cgst-rate[]" step="0.01">
-          <label>IGST %:</label><input type="number" name="igst-rate[]" step="0.01">
-          <div class="sub-items-container">
-            <h4>Sub-Services (Optional)</h4>
-            <div class="sub-item">
-              <label>Sub-Service Description:</label><textarea name="sub-description[]"></textarea>
-              <label>Sub-Service Taxable Value:</label><input type="number" name="sub-taxable-value[]" step="0.01">
-              <button type="button" class="remove-sub-item">Remove Sub-Service</button>
-            </div>
-          </div>
-          <button type="button" class="add-sub-item">Add Sub-Service</button>
-          <button type="button" class="remove-item">Remove Service</button>
-        </div>
-      `;
-      const invoiceNo = await generateInvoiceNumber();
-      document.getElementById('invoice-no').value = invoiceNo;
-    }
-
-    // Tab switching
-    document.querySelectorAll('.tab').forEach(tab => {
-      tab.addEventListener('click', async function() {
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        this.classList.add('active');
-
-        document.querySelectorAll('.dashboard, .purchase-form-container, .invoice-form-container, .invoice-preview').forEach(section => {
-          section.style.display = 'none';
-        });
-        document.getElementById(this.dataset.tab).style.display = 'block';
-
-        if (this.dataset.tab === 'services') {
-          updateDashboard();
-        } else if (this.dataset.tab === 'purchases') {
-          updatePurchaseList();
-          await resetPurchaseForm();
-        } else if (this.dataset.tab === 'create-invoice' && !editingInvoiceId) {
-          await resetInvoiceForm();
-        }
-      });
-    });
-
-    // Populate year and financial year dropdowns
     const currentYear = new Date().getFullYear();
     const selectYear = document.getElementById('year-select');
     const selectFY = document.getElementById('fy-select');
+    const filterYear = document.getElementById('filter-year');
+    const filterDay = document.getElementById('filter-day');
+
+    // Populate year dropdowns
     for (let year = currentYear - 5; year <= currentYear + 5; year++) {
       const option = document.createElement('option');
       option.value = year;
       option.text = year;
       if (year === currentYear) option.selected = true;
       selectYear.appendChild(option);
-
       const fyOption = document.createElement('option');
       fyOption.value = `${year}-${year + 1}`;
       fyOption.text = `Apr-${year} to Mar-${year + 1}`;
       if (year === currentYear - 1) fyOption.selected = true;
       selectFY.appendChild(fyOption);
+      const filterYearOption = document.createElement('option');
+      filterYearOption.value = year;
+      filterYearOption.text = year;
+      filterYear.appendChild(filterYearOption);
     }
 
-    // Save or update invoice to Firestore
-    async function saveInvoice(invoiceData) {
-      try {
-        // Validate invoice number uniqueness
-        const isUnique = await isInvoiceNumberUnique(invoiceData.invoiceNo, editingInvoiceId);
-        if (!isUnique) {
-          alert('Invoice number already exists. Please use a unique invoice number.');
-          return false;
-        }
-
-        invoiceData.status = 'active'; // Set status to active
-        if (editingInvoiceId) {
-          // Update existing invoice
-          await setDoc(doc(db, 'invoices', editingInvoiceId), invoiceData, { merge: true });
-          editingInvoiceId = null; // Reset editing state
-          document.getElementById('form-title').innerText = 'Create Invoice';
-        } else {
-          // Add new invoice
-          await addDoc(collection(db, 'invoices'), invoiceData);
-        }
-        return true;
-      } catch (error) {
-        console.error('Error saving invoice:', error);
-        alert('Failed to save invoice.');
-        return false;
-      }
+    // Populate day dropdown
+    for (let day = 1; day <= 31; day++) {
+      const option = document.createElement('option');
+      option.value = day;
+      option.text = day;
+      filterDay.appendChild(option);
     }
 
-    // Save purchase to Firestore
-    async function savePurchase(purchaseData) {
-      try {
-        purchaseData.purchaseId = await generatePurchaseId();
-        await addDoc(collection(db, 'purchases'), purchaseData);
-        alert('Purchase saved successfully.');
-        return true;
-      } catch (error) {
-        console.error('Error saving purchase:', error);
-        alert('Failed to save purchase.');
-        return false;
-      }
-    }
-
-    // Update purchase list
-    async function updatePurchaseList() {
-      if (!db) {
-        alert('Firestore is not initialized.');
-        return;
-      }
-
-      const purchaseListBody = document.getElementById('purchase-list-body');
-      purchaseListBody.innerHTML = '';
-
-      try {
-        const querySnapshot = await getDocs(collection(db, 'purchases'));
-        querySnapshot.forEach(doc => {
-          const purchase = doc.data();
-          const row = document.createElement('tr');
-          row.innerHTML = `
-            <td>${purchase.purchaseId}</td>
-            <td>${purchase.purchaseDate}</td>
-            <td>${purchase.paymentType}</td>
-            <td>${purchase.paymentMethod || '-'}</td>
-            <td>${purchase.passengerNames.replace(/\n/g, '<br>')}</td>
-            <td>${purchase.hotelBooked}</td>
-            <td>${purchase.serviceDescription.replace(/\n/g, '<br>')}</td>
-            <td>Rs. ${purchase.commission.toFixed(2)}</td>
-            <td>Rs. ${purchase.tds.toFixed(2)}</td>
-            <td>Rs. ${purchase.grossAmount.toFixed(2)}</td>
-            <td>Rs. ${purchase.netAmount.toFixed(2)}</td>
-          `;
-          purchaseListBody.appendChild(row);
-        });
-      } catch (error) {
-        console.error('Error fetching purchases:', error);
-        alert('Failed to load purchase data.');
-      }
-    }
-
-    // Cancel or undo cancel invoice in Firestore
     async function cancelInvoice(invoiceId) {
       const password = prompt('Enter password to cancel/undo cancel invoice:');
       if (password === 'vardhan') {
@@ -883,132 +349,55 @@
       }
     }
 
-    // Edit invoice: Populate form with invoice data
     async function editInvoice(invoiceId) {
-      try {
-        const docRef = doc(db, 'invoices', invoiceId);
-        const docSnap = await getDoc(docRef);
-        if (!docSnap.exists()) {
-          alert('Invoice not found.');
-          return;
-        }
-
-        const invoiceData = docSnap.data();
-        if (invoiceData.status === 'canceled') {
-          alert('Cannot edit a canceled invoice.');
-          return;
-        }
-
-        editingInvoiceId = invoiceId;
-        document.getElementById('form-title').innerText = 'Edit Invoice Details';
-
-        // Populate form fields
-        const form = document.getElementById('invoice-form');
-        form['invoice-date'].value = invoiceData.date || '';
-        form['invoice-no'].value = invoiceData.invoiceNo || '';
-        form['place-of-supply'].value = invoiceData.placeOfSupply || '';
-        form['customer-name'].value = invoiceData.customerName || '';
-        form['customer-address'].value = invoiceData.customerAddress || '';
-        form['customer-gstin'].value = invoiceData.customerGSTIN || '';
-        form['customer-state'].value = invoiceData.customerState || '';
-
-        // Clear existing items
-        const itemsContainer = document.getElementById('items-container');
-        itemsContainer.innerHTML = '';
-
-        // Populate items
-        invoiceData.items.forEach((item, index) => {
-          const itemDiv = document.createElement('div');
-          itemDiv.className = 'item';
-          itemDiv.innerHTML = `
-            <label>Service Description:</label><textarea name="description[]">${item.description || ''}</textarea>
-            <label>SAC Code:</label><input type="text" name="sac-code[]" value="${item.sacCode || ''}">
-            <label>Tax Type:</label><input type="text" name="tax-type[]" value="${item.taxType || ''}">
-            <label>Taxable Value:</label><input type="number" name="taxable-value[]" step="0.01" value="${item.taxableValue || ''}">
-            <label>SGST %:</label><input type="number" name="sgst-rate[]" step="0.01" value="${item.sgstRate || ''}">
-            <label>CGST %:</label><input type="number" name="cgst-rate[]" step="0.01" value="${item.cgstRate || ''}">
-            <label>IGST %:</label><input type="number" name="igst-rate[]" step="0.01" value="${item.igstRate || ''}">
-            <div class="sub-items-container">
-              <h4>Sub-Services (Optional)</h4>
-              ${item.subItems && item.subItems.length > 0 ? item.subItems.map(subItem => `
-                <div class="sub-item">
-                  <label>Sub-Service Description:</label><textarea name="sub-description[]">${subItem.description || ''}</textarea>
-                  <label>Sub-Service Taxable Value:</label><input type="number" name="sub-taxable-value[]" step="0.01" value="${subItem.taxableValue || ''}">
-                  <button type="button" class="remove-sub-item">Remove Sub-Service</button>
-                </div>
-              `).join('') : `
-                <div class="sub-item">
-                  <label>Sub-Service Description:</label><textarea name="sub-description[]"></textarea>
-                  <label>Sub-Service Taxable Value:</label><input type="number" name="sub-taxable-value[]" step="0.01">
-                  <button type="button" class="remove-sub-item">Remove Sub-Service</button>
-                </div>
-              `}
-            </div>
-            <button type="button" class="add-sub-item">Add Sub-Service</button>
-            <button type="button" class="remove-item">Remove Service</button>
-          `;
-          itemsContainer.appendChild(itemDiv);
-        });
-
-        // Switch to create-invoice tab
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        document.querySelector('.tab[data-tab="create-invoice"]').classList.add('active');
-        document.querySelectorAll('.dashboard, .purchase-form-container, .invoice-form-container, .invoice-preview').forEach(section => {
-          section.style.display = 'none';
-        });
-        document.getElementById('create-invoice').style.display = 'block';
-      } catch (error) {
-        console.error('Error fetching invoice:', error);
-        alert('Failed to load invoice data.');
-      }
+      window.location.href = `create-invoice.html?invoiceId=${invoiceId}`;
     }
 
-    // Update dashboard statistics
     async function updateDashboard() {
       if (!db) {
         alert('Firestore is not initialized.');
         return;
       }
-
       const selectedMonth = parseInt(document.getElementById('month-select').value);
       const selectedYear = parseInt(document.getElementById('year-select').value);
       const selectedFY = document.getElementById('fy-select').value;
       const [fyStart, fyEnd] = selectedFY.split('-').map(Number);
       const searchQuery = document.getElementById('search-input').value.trim().toLowerCase();
-
-      // Monthly stats
+      const filterDay = document.getElementById('filter-day').value;
+      const filterMonth = document.getElementById('filter-month').value;
+      const filterYear = document.getElementById('filter-year').value;
       let monthlyInvoices = 0;
       let monthlySubtotal = 0;
       let monthlyGST = 0;
       let monthlyEarnings = 0;
       let monthlyPending = 0;
-
-      // Yearly stats
       let yearlyInvoices = 0;
       let yearlySubtotal = 0;
       let yearlyGST = 0;
       let yearlyEarnings = 0;
       let yearlyPending = 0;
-
       const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
       const selectedMonthName = monthNames[selectedMonth - 1];
-
-      // Fetch invoices from Firestore
       const invoiceListBody = document.getElementById('invoice-list-body');
       invoiceListBody.innerHTML = '';
-
       try {
         const querySnapshot = await getDocs(collection(db, 'invoices'));
         const invoices = [];
         querySnapshot.forEach(doc => {
           invoices.push({ id: doc.id, ...doc.data() });
         });
-
         invoices.forEach(invoice => {
-          // Skip invalid invoices
           if (!invoice || !invoice.date || !Array.isArray(invoice.items)) return;
-
-          // Apply search filter
+          const invoiceDate = new Date(invoice.date);
+          if (isNaN(invoiceDate.getTime())) return;
+          const invoiceDay = invoiceDate.getDate();
+          const invoiceMonth = invoiceDate.getMonth() + 1;
+          const invoiceYear = invoiceDate.getFullYear();
+          const invoiceFY = invoiceMonth >= 4 ? `${invoiceYear}-${invoiceYear + 1}` : `${invoiceYear - 1}-${invoiceYear}`;
+          // Apply date filters
+          if (filterDay && parseInt(filterDay) !== invoiceDay) return;
+          if (filterMonth && parseInt(filterMonth) !== invoiceMonth) return;
+          if (filterYear && parseInt(filterYear) !== invoiceYear) return;
           if (searchQuery) {
             const matchesSearch =
               (invoice.invoiceNo || '').toLowerCase().includes(searchQuery) ||
@@ -1016,15 +405,6 @@
               (invoice.date || '').toLowerCase().includes(searchQuery);
             if (!matchesSearch) return;
           }
-
-          const invoiceDate = new Date(invoice.date);
-          if (isNaN(invoiceDate.getTime())) return;
-
-          const invoiceMonth = invoiceDate.getMonth() + 1;
-          const invoiceYear = invoiceDate.getFullYear();
-          const invoiceFY = invoiceMonth >= 4 ? `${invoiceYear}-${invoiceYear + 1}` : `${invoiceYear - 1}-${invoiceYear}`;
-
-          // Calculate metrics only for active invoices
           if (invoice.status !== 'canceled') {
             const subtotal = invoice.items.reduce((sum, item) => {
               const itemValue = parseFloat(item.taxableValue) || 0;
@@ -1032,7 +412,6 @@
                 item.subItems.reduce((subSum, subItem) => subSum + (parseFloat(subItem.taxableValue) || 0), 0) : 0;
               return sum + itemValue + subItemsValue;
             }, 0);
-
             const gstTotal = invoice.items.reduce((sum, item) => {
               const sgst = (parseFloat(item.taxableValue) || 0) * (parseFloat(item.sgstRate) || 0) / 100;
               const cgst = (parseFloat(item.taxableValue) || 0) * (parseFloat(item.cgstRate) || 0) / 100;
@@ -1045,11 +424,8 @@
               }, 0) : 0;
               return sum + sgst + cgst + igst + subItemsGST;
             }, 0);
-
             const earnings = subtotal + gstTotal;
             const pending = earnings;
-
-            // Monthly stats
             if (invoiceMonth === selectedMonth && invoiceYear === selectedYear) {
               monthlyInvoices++;
               monthlySubtotal += subtotal;
@@ -1057,8 +433,6 @@
               monthlyEarnings += earnings;
               monthlyPending += pending;
             }
-
-            // Yearly stats
             if (invoiceFY === selectedFY) {
               yearlyInvoices++;
               yearlySubtotal += subtotal;
@@ -1067,8 +441,6 @@
               yearlyPending += pending;
             }
           }
-
-          // Add invoice to list (including canceled if matches search)
           const row = document.createElement('tr');
           if (invoice.status === 'canceled') row.classList.add('canceled-row');
           const status = invoice.status === 'canceled' ? 'Canceled' : 'Active';
@@ -1079,14 +451,26 @@
             <td>Rs. ${invoice.total.toLocaleString('en-IN')}</td>
             <td>${status}</td>
             <td>
+              <button class="action-btn view-btn" data-id="${invoice.id}">View</button>
+              <button class="action-btn print-btn" data-id="${invoice.id}">Print</button>
               <button class="edit-btn" data-id="${invoice.id}">Edit</button>
               <button class="cancel-btn" data-id="${invoice.id}">${status === 'Canceled' ? 'Undo Cancel' : 'Cancel'}</button>
             </td>
           `;
           invoiceListBody.appendChild(row);
         });
-
-        // Attach event listeners to edit and cancel buttons
+        document.querySelectorAll('.view-btn').forEach(button => {
+          button.addEventListener('click', () => {
+            const invoiceId = button.getAttribute('data-id');
+            window.location.href = `invoice-preview.html?invoiceId=${invoiceId}`;
+          });
+        });
+        document.querySelectorAll('.print-btn').forEach(button => {
+          button.addEventListener('click', () => {
+            const invoiceId = button.getAttribute('data-id');
+            window.location.href = `invoice-preview.html?invoiceId=${invoiceId}&print=true`;
+          });
+        });
         document.querySelectorAll('.edit-btn').forEach(button => {
           button.addEventListener('click', () => {
             const invoiceId = button.getAttribute('data-id');
@@ -1099,25 +483,19 @@
             cancelInvoice(invoiceId);
           });
         });
-
-        // Update monthly stats
         document.getElementById('monthly-value').innerText = monthlyInvoices;
         document.getElementById('subtotal-monthly').innerText = `Rs. ${monthlySubtotal.toLocaleString('en-IN')}`;
         document.getElementById('gst-monthly').innerText = `Rs. ${monthlyGST.toFixed(2)}`;
         document.getElementById('earnings-monthly').innerText = `Rs. ${monthlyEarnings.toLocaleString('en-IN')}`;
         document.getElementById('pending-monthly').innerText = `Rs. ${monthlyPending.toLocaleString('en-IN')}`;
-
         document.querySelectorAll('.stat-box.monthly h3').forEach(h3 => {
           h3.innerText = h3.innerText.replace(/\(.*?\)/, `(${selectedMonthName}-${selectedYear})`);
         });
-
-        // Update yearly stats
         document.getElementById('yearly-value').innerText = yearlyInvoices;
         document.getElementById('subtotal-yearly').innerText = `Rs. ${yearlySubtotal.toLocaleString('en-IN')}`;
         document.getElementById('gst-yearly').innerText = `Rs. ${yearlyGST.toFixed(2)}`;
         document.getElementById('earnings-yearly').innerText = `Rs. ${yearlyEarnings.toLocaleString('en-IN')}`;
         document.getElementById('pending-yearly').innerText = `Rs. ${yearlyPending.toFixed(2)}`;
-
         document.querySelectorAll('.stat-box.yearly h3').forEach(h3 => {
           h3.innerText = h3.innerText.replace(/\(.*?\)/, `(${fyStart}-${fyEnd})`);
         });
@@ -1127,12 +505,10 @@
       }
     }
 
-    // Download report
     async function downloadReport() {
       const selectedMonth = document.getElementById('month-select').options[document.getElementById('month-select').selectedIndex].text;
       const selectedYear = document.getElementById('year-select').value;
       const selectedFY = document.getElementById('fy-select').value;
-
       const report = `
 Dashboard Report
 Month: ${selectedMonth}-${selectedYear}
@@ -1141,7 +517,6 @@ Subtotal: ${document.getElementById('subtotal-monthly').textContent}
 GST Total: ${document.getElementById('gst-monthly').textContent}
 Earnings: ${document.getElementById('earnings-monthly').textContent}
 Pending: ${document.getElementById('pending-monthly').textContent}
-
 Financial Year: ${selectedFY}
 Invoices: ${document.getElementById('yearly-value').textContent}
 Subtotal: ${document.getElementById('subtotal-yearly').textContent}
@@ -1149,7 +524,6 @@ GST Total: ${document.getElementById('gst-yearly').textContent}
 Earnings: ${document.getElementById('earnings-yearly').textContent}
 Pending: ${document.getElementById('pending-yearly').textContent}
       `;
-
       const blob = new Blob([report], { type: 'text/plain' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
@@ -1157,332 +531,21 @@ Pending: ${document.getElementById('pending-yearly').textContent}
       link.click();
     }
 
-    function numberToWords(num) {
-      if (num === 0) return 'Zero Rupees Only';
-
-      const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
-      const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
-      const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
-
-      function convertLessThanThousand(n) {
-        if (n === 0) return '';
-        if (n < 10) return ones[n];
-        if (n < 20) return teens[n - 10];
-        if (n < 100) {
-          const ten = Math.floor(n / 10);
-          const unit = n % 10;
-          return tens[ten] + (unit ? ' ' + ones[unit] : '');
-        }
-        const hundred = Math.floor(n / 100);
-        const rest = n % 100;
-        return ones[hundred] + ' Hundred' + (rest ? ' and ' + convertLessThanThousand(rest) : '');
-      }
-
-      let words = '';
-      let crore = Math.floor(num / 10000000);
-      num %= 10000000;
-      let lakh = Math.floor(num / 100000);
-      num %= 100000;
-      let thousand = Math.floor(num / 1000);
-      num %= 1000;
-      let hundreds = num;
-
-      if (crore) words += convertLessThanThousand(crore) + ' Crore ';
-      if (lakh) words += convertLessThanThousand(lakh) + ' Lakh ';
-      if (thousand) words += convertLessThanThousand(thousand) + ' Thousand ';
-      if (hundreds) words += convertLessThanThousand(hundreds);
-
-      return words.trim() + ' Rupees Only';
-    }
-
-    // Purchase form logic
-    document.getElementById('payment-credit').addEventListener('change', function() {
-      document.getElementById('payment-method').style.display = 'none';
-      document.getElementById('payment-method-label').style.display = 'none';
-      document.getElementById('payment-method').value = '';
-    });
-
-    document.getElementById('payment-cash').addEventListener('change', function() {
-      document.getElementById('payment-method').style.display = 'block';
-      document.getElementById('payment-method-label').style.display = 'block';
-    });
-
-    function calculateNetAmount() {
-      const commission = parseFloat(document.getElementById('commission').value) || 0;
-      const tds = parseFloat(document.getElementById('tds').value) || 0;
-      const gross = parseFloat(document.getElementById('gross-amount').value) || 0;
-      const net = gross - commission + tds;
-      document.getElementById('net-amount').value = net.toFixed(2);
-    }
-
-    document.getElementById('commission').addEventListener('input', calculateNetAmount);
-    document.getElementById('tds').addEventListener('input', calculateNetAmount);
-    document.getElementById('gross-amount').addEventListener('input', calculateNetAmount);
-
-    document.getElementById('save-purchase-btn').addEventListener('click', async function() {
-      const form = document.getElementById('purchase-form');
-      if (!form.checkValidity()) {
-        alert('Please fill all required fields.');
-        return;
-      }
-
-      const paymentType = document.querySelector('input[name="payment-type"]:checked').value;
-      const paymentMethod = paymentType === 'cash' ? document.getElementById('payment-method').value : '';
-
-      const purchaseData = {
-        purchaseDate: document.getElementById('purchase-date').value,
-        paymentType: paymentType,
-        paymentMethod: paymentMethod,
-        passengerNames: document.getElementById('passenger-names').value,
-        hotelBooked: document.getElementById('hotel-booked').value,
-        serviceDescription: document.getElementById('service-description').value,
-        commission: parseFloat(document.getElementById('commission').value) || 0,
-        tds: parseFloat(document.getElementById('tds').value) || 0,
-        grossAmount: parseFloat(document.getElementById('gross-amount').value) || 0,
-        netAmount: parseFloat(document.getElementById('net-amount').value) || 0
-      };
-
-      const saved = await savePurchase(purchaseData);
-      if (saved) {
-        await resetPurchaseForm();
-        updatePurchaseList();
-      }
-    });
-
-    document.getElementById('reset-purchase-btn').addEventListener('click', async function() {
-      await resetPurchaseForm();
-    });
-
-    document.getElementById('add-item').addEventListener('click', function() {
-      const itemsContainer = document.getElementById('items-container');
-      const newItem = itemsContainer.firstElementChild.cloneNode(true);
-      newItem.querySelectorAll('input, textarea').forEach(input => input.value = '');
-      newItem.querySelector('.sub-items-container').innerHTML = `
-        <h4>Sub-Services (Optional)</h4>
-        <div class="sub-item">
-          <label>Sub-Service Description:</label><textarea name="sub-description[]"></textarea>
-          <label>Sub-Service Taxable Value:</label><input type="number" name="sub-taxable-value[]" step="0.01">
-          <button type="button" class="remove-sub-item">Remove Sub-Service</button>
-        </div>
-      `;
-      itemsContainer.appendChild(newItem);
-    });
-
-    document.getElementById('items-container').addEventListener('click', function(e) {
-      if (e.target.classList.contains('remove-item')) {
-        const item = e.target.closest('.item');
-        const items = document.querySelectorAll('#items-container .item');
-        if (items.length > 1) {
-          item.remove();
-        } else {
-          alert('At least one item is required.');
-        }
-      } else if (e.target.classList.contains('add-sub-item')) {
-        const subItemsContainer = e.target.previousElementSibling;
-        const newSubItem = subItemsContainer.querySelector('.sub-item').cloneNode(true);
-        newSubItem.querySelectorAll('input, textarea').forEach(input => input.value = '');
-        subItemsContainer.appendChild(newSubItem);
-      } else if (e.target.classList.contains('remove-sub-item')) {
-        const subItem = e.target.closest('.sub-item');
-        const subItems = subItem.parentElement.querySelectorAll('.sub-item');
-        if (subItems.length > 1) {
-          subItem.remove();
-        } else {
-          alert('At least one sub-service is required if you have sub-items.');
-        }
-      }
-    });
-
-    document.getElementById('preview-btn').addEventListener('click', async function () {
-      const form = document.getElementById('invoice-form');
-
-      document.getElementById('inv-date').innerText = form['invoice-date'].value || '';
-      document.getElementById('inv-no').innerText = form['invoice-no'].value || '';
-      document.getElementById('supply-place').innerText = form['place-of-supply'].value || '';
-      document.getElementById('cust-name').innerText = form['customer-name'].value || '';
-      document.getElementById('cust-address').innerText = form['customer-address'].value || '';
-      document.getElementById('cust-gstin').innerText = form['customer-gstin'].value || '';
-      document.getElementById('cust-state').innerText = form['customer-state'].value || '';
-
-      const tbody = document.getElementById('invoice-table-body');
-      tbody.innerHTML = '';
-
-      let totalBeforeTax = 0;
-      let totalSGST = 0;
-      let totalCGST = 0;
-      let totalIGST = 0;
-
-      const items = document.querySelectorAll('#items-container .item');
-      const invoiceItems = [];
-
-      items.forEach((item, index) => {
-        const description = item.querySelector('[name="description[]"]').value || '';
-        const sac = item.querySelector('[name="sac-code[]"]').value || '';
-        const taxType = item.querySelector('[name="tax-type[]"]').value || '';
-        const taxableValue = parseFloat(item.querySelector('[name="taxable-value[]"]').value) || 0;
-        const sgstRate = parseFloat(item.querySelector('[name="sgst-rate[]"]').value) || 0;
-        const cgstRate = parseFloat(item.querySelector('[name="cgst-rate[]"]').value) || 0;
-        const igstRate = parseFloat(item.querySelector('[name="igst-rate[]"]').value) || 0;
-
-        let sgstAmt = taxableValue * sgstRate / 100 || 0;
-        let cgstAmt = taxableValue * cgstRate / 100 || 0;
-        let igstAmt = taxableValue * igstRate / 100 || 0;
-        let total = taxableValue + sgstAmt + cgstAmt + igstAmt;
-
-        totalBeforeTax += taxableValue;
-        totalSGST += sgstAmt;
-        totalCGST += cgstAmt;
-        totalIGST += igstAmt;
-
-        const row = document.createElement('tr');
-        row.innerHTML = `
-          <td>${index + 1}</td>
-          <td>${description.replace(/\n/g, '<br>')}</td>
-          <td>${sac}</td>
-          <td>${taxType}</td>
-          <td>${taxableValue.toFixed(2)}</td>
-          <td>${sgstRate.toFixed(2)}</td>
-          <td>${sgstAmt.toFixed(2)}</td>
-          <td>${cgstRate.toFixed(2)}</td>
-          <td>${cgstAmt.toFixed(2)}</td>
-          <td>${igstRate.toFixed(2)}</td>
-          <td>${igstAmt.toFixed(2)}</td>
-          <td>${total.toFixed(2)}</td>
-        `;
-        tbody.appendChild(row);
-
-        const subItems = item.querySelectorAll('.sub-item');
-        const subItemsData = [];
-        subItems.forEach((subItem) => {
-          const subDescription = subItem.querySelector('[name="sub-description[]"]').value || '';
-          const subTaxableValue = parseFloat(subItem.querySelector('[name="sub-taxable-value[]"]').value) || 0;
-
-          if (subDescription || subTaxableValue) {
-            sgstAmt = subTaxableValue * sgstRate / 100 || 0;
-            cgstAmt = subTaxableValue * cgstRate / 100 || 0;
-            igstAmt = subTaxableValue * igstRate / 100 || 0;
-            total = subTaxableValue + sgstAmt + cgstAmt + igstAmt;
-
-            totalBeforeTax += subTaxableValue;
-            totalSGST += sgstAmt;
-            totalCGST += cgstAmt;
-            totalIGST += igstAmt;
-
-            const subRow = document.createElement('tr');
-            subRow.innerHTML = `
-              <td></td>
-              <td>${subDescription.replace(/\n/g, '<br>')}</td>
-              <td></td>
-              <td></td>
-              <td>${subTaxableValue.toFixed(2)}</td>
-              <td>${sgstRate.toFixed(2)}</td>
-              <td>${sgstAmt.toFixed(2)}</td>
-              <td>${cgstRate.toFixed(2)}</td>
-              <td>${cgstAmt.toFixed(2)}</td>
-              <td>${igstRate.toFixed(2)}</td>
-              <td>${igstAmt.toFixed(2)}</td>
-              <td>${total.toFixed(2)}</td>
-            `;
-            tbody.appendChild(subRow);
-
-            subItemsData.push({
-              description: subDescription,
-              taxableValue: subTaxableValue
-            });
-          }
-        });
-
-        invoiceItems.push({
-          description,
-          sacCode: sac,
-          taxType,
-          taxableValue,
-          sgstRate,
-          cgstRate,
-          igstRate,
-          subItems: subItemsData
-        });
-      });
-
-      const totalRow = document.createElement('tr');
-      totalRow.innerHTML = `
-        <td colspan="11" style="text-align:right;font-weight:bold;">Total Invoice Value</td>
-        <td>${(totalBeforeTax + totalSGST + totalCGST + totalIGST).toFixed(2)}</td>
-      `;
-      tbody.appendChild(totalRow);
-
-      const grossTotal = totalBeforeTax + totalSGST + totalCGST + totalIGST;
-      const roundedTotal = Math.round(grossTotal);
-      const rounding = roundedTotal - grossTotal;
-
-      document.getElementById('total-before-tax').innerText = totalBeforeTax.toFixed(2);
-      document.getElementById('sgst-amount').innerText = totalSGST.toFixed(2);
-      document.getElementById('cgst-amount').innerText = totalCGST.toFixed(2);
-      document.getElementById('igst-amount').innerText = totalIGST.toFixed(2);
-      document.getElementById('rounding').innerText = rounding.toFixed(2);
-      document.getElementById('total-invoice-value-table').innerText = roundedTotal.toFixed(2);
-      document.getElementById('total-in-words').innerText = numberToWords(roundedTotal);
-
-      // Save invoice to Firestore
-      const invoiceData = {
-        date: form['invoice-date'].value,
-        invoiceNo: form['invoice-no'].value,
-        placeOfSupply: form['place-of-supply'].value,
-        customerName: form['customer-name'].value,
-        customerAddress: form['customer-address'].value,
-        customerGSTIN: form['customer-gstin'].value,
-        customerState: form['customer-state'].value,
-        items: invoiceItems,
-        total: roundedTotal
-      };
-      const saved = await saveInvoice(invoiceData);
-      if (!saved) return;
-
-      // Reset form after saving
-      await resetInvoiceForm();
-
-      // Update dashboard
-      updateDashboard();
-
-      // Switch to invoice preview tab
-      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-      document.querySelector('.tab[data-tab="invoice-btn"]').classList.add('active');
-      document.querySelectorAll('.dashboard, .purchase-form-container, .invoice-form-container, .invoice-preview').forEach(section => {
-        section.style.display = 'none';
-      });
-      document.getElementById('invoice-btn').style.display = 'block';
-    });
-
-    document.getElementById('download-btn').addEventListener('click', function () {
-      const invoiceElement = document.getElementById('invoice');
-      html2canvas(invoiceElement, { scale: 2 }).then(canvas => {
-        const imgData = canvas.toDataURL('image/png');
-        const pdf = new jspdf.jsPDF('p', 'mm', 'a4');
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = pdf.internal.pageSize.getHeight();
-        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-        pdf.save('invoice.pdf');
-      });
-    });
-
-    document.getElementById('print-btn').addEventListener('click', function () {
-      window.print();
-    });
-
-    // Attach event listeners for filter and search
     document.getElementById('filter-btn').addEventListener('click', updateDashboard);
     document.getElementById('search-btn').addEventListener('click', updateDashboard);
     document.getElementById('clear-search-btn').addEventListener('click', () => {
       document.getElementById('search-input').value = '';
       updateDashboard();
     });
+    document.getElementById('apply-filter-btn').addEventListener('click', updateDashboard);
+    document.getElementById('clear-filter-btn').addEventListener('click', () => {
+      document.getElementById('filter-day').value = '';
+      document.getElementById('filter-month').value = '';
+      document.getElementById('filter-year').value = '';
+      updateDashboard();
+    });
 
-    // Initial dashboard update
     updateDashboard();
-
-    // Initialize forms
-    resetInvoiceForm();
-    resetPurchaseForm();
   </script>
 </body>
 </html>

@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Invoice Preview</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script type="module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"></script>
+  <script type="module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
+    }
+    .tabs {
+      display: flex;
+      justify-content: center;
+      margin: 20px 0;
+    }
+    .tab {
+      padding: 10px 20px;
+      cursor: pointer;
+      background: #ddd;
+      margin: 0 5px;
+      border-radius: 5px;
+      text-decoration: none;
+      color: black;
+    }
+    .tab.active {
+      background: #007bff;
+      color: white;
+    }
+    .invoice-preview {
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      background: white;
+      border: 1px solid #ccc;
+    }
+    .invoice-page {
+      width: 210mm;
+      min-height: 297mm;
+      margin: 10px auto;
+      background: white;
+      padding: 10mm;
+      border: 1px solid #000;
+      box-sizing: border-box;
+      page-break-after: always;
+    }
+    .invoice-page:last-child {
+      page-break-after: auto;
+    }
+    @media print {
+      @page {
+        size: A4;
+        margin: 0;
+      }
+      body * {
+        visibility: hidden;
+      }
+      .invoice-page, .invoice-page * {
+        visibility: visible;
+      }
+      .invoice-page {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 210mm;
+        min-height: 297mm;
+        margin: 0;
+        padding: 5mm;
+        border: none;
+        box-sizing: border-box;
+        transform: scale(1);
+        transform-origin: top left;
+      }
+      .download-btn, #save-btn {
+        display: none;
+      }
+    }
+    @media screen and (max-width: 768px) {
+      .invoice-page {
+        width: 100%;
+        min-height: auto;
+        padding: 5mm;
+        font-size: 8px;
+      }
+      .invoice-preview {
+        padding: 10px;
+      }
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    .logo {
+      height: 40px;
+    }
+    .title {
+      font-size: 20px;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+    .section {
+      font-size: 12px;
+      margin-bottom: 10px;
+    }
+    .bold {
+      font-weight: bold;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 10px;
+    }
+    th, td {
+      border: 1px solid #000;
+      padding: 4px;
+      text-align: left;
+    }
+    .bank-section {
+      width: 100%;
+      display: flex;
+      flex-direction: row;
+      flex-wrap: wrap;
+      font-size: 10px;
+      margin-top: 15px;
+    }
+    .terms, .signature {
+      font-size: 10px;
+    }
+    .download-btn, #save-btn {
+      display: block;
+      width: 90%;
+      max-width: 300px;
+      margin: 10px auto;
+      padding: 10px;
+      font-size: 14px;
+      cursor: pointer;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+    }
+    .right-info {
+      font-size: 10px;
+      text-align: right;
+      margin-top: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="tabs">
+    <a class="tab" href="index.html">Back to Dashboard</a>
+    <a class="tab" href="create-invoice.html">Create Invoice</a>
+    <a class="tab" href="invoice.html">Purchase Records</a>
+    <div class="tab active" data-tab="invoice-btn">Invoice Preview</div>
+  </div>
+
+  <div class="invoice-preview" id="invoice-btn">
+    <div id="invoice-pages"></div>
+    <button id="download-btn" class="download-btn">Download Invoice PDF</button>
+    <button id="save-btn" class="download-btn">Save Invoice</button>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+    import { getFirestore, doc, getDoc, collection, addDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAT3oqplHoUuZrDNpnZbQ-hoUChLLEdmV4",
+      authDomain: "saas-restaurant-vardhan.firebaseapp.com",
+      projectId: "saas-restaurant-vardhan",
+      storageBucket: "saas-restaurant-vardhan.appspot.com",
+      messagingSenderId: "1019077493371",
+      appId: "1:1019077493371:web:2c92f2c902e34b05c358de"
+    };
+
+    let db;
+    try {
+      const app = initializeApp(firebaseConfig);
+      db = getFirestore(app);
+    } catch (error) {
+      console.error('Error initializing Firebase:', error);
+      alert('Failed to initialize Firebase. Please check your configuration.');
+    }
+
+    function numberToWords(num) {
+      if (num === 0) return 'Zero Rupees Only';
+      const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+      const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+      const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+      function convertLessThanThousand(n) {
+        if (n === 0) return '';
+        if (n < 10) return ones[n];
+        if (n < 20) return teens[n - 10];
+        if (n < 100) {
+          const ten = Math.floor(n / 10);
+          const unit = n % 10;
+          return tens[ten] + (unit ? ' ' + ones[unit] : '');
+        }
+        const hundred = Math.floor(n / 100);
+        const rest = n % 100;
+        return ones[hundred] + ' Hundred' + (rest ? ' and ' + convertLessThanThousand(rest) : '');
+      }
+      let words = '';
+      let crore = Math.floor(num / 10000000);
+      num %= 10000000;
+      let lakh = Math.floor(num / 100000);
+      num %= 100000;
+      let thousand = Math.floor(num / 1000);
+      num %= 1000;
+      let hundreds = num;
+      if (crore) words += convertLessThanThousand(crore) + ' Crore ';
+      if (lakh) words += convertLessThanThousand(lakh) + ' Lakh ';
+      if (thousand) words += convertLessThanThousand(thousand) + ' Thousand ';
+      if (hundreds) words += convertLessThanThousand(hundreds);
+      return words.trim() + ' Rupees Only';
+    }
+
+    function createPageContent(pageNumber, invoiceData, items, startIndex, endIndex, totals) {
+      const page = document.createElement('div');
+      page.className = 'invoice-page';
+      page.id = `invoice-page-${pageNumber}`;
+      page.innerHTML = `
+        <div class="header">
+          <div>
+            <p class="title">TAX INVOICE</p>
+            <div class="section">
+              <p><span class="bold">Invoice Date :</span> <span>${invoiceData.date || ''}</span></p>
+              <p><span class="bold">Invoice No :</span> <span>${invoiceData.invoiceNo || ''}</span></p>
+              <p><span class="bold">Place of Supply :</span> <span>${invoiceData.placeOfSupply || ''}</span></p>
+            </div>
+            <div class="section">
+              <p><span class="bold">Name :</span> <span>${invoiceData.customerName || ''}</span></p>
+              <p><span class="bold">Address :</span> <span>${invoiceData.customerAddress || ''}</span></p>
+              <p><span class="bold">GSTIN :</span> <span>${invoiceData.customerGSTIN || ''}</span></p>
+              <p><span class="bold">STATE :</span> <span>${invoiceData.customerState || ''}</span></p>
+            </div>
+          </div>
+          <div style="text-align: right;">
+            <img src="image.png" class="logo" alt="Tripzetta Logo">
+            <div class="right-info">
+              <p><strong>GSTIN :</strong> 07APDPA8620A1ZL</p>
+              <p><strong>PAN :</strong> APDPA8620A</p>
+              <p><strong>Regd. Address :</strong> 408 4th Floor Devika Tower Nehru Place New Delhi</p>
+              <p><strong>Contact:</strong> +919650485130</p>
+            </div>
+          </div>
+        </div>
+        <table id="invoice-table-${pageNumber}">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Service Description</th>
+              <th>SAC Code</th>
+              <th>Tax Type</th>
+              <th>Taxable Value</th>
+              <th>SGST%</th>
+              <th>SGST Amount</th>
+              <th>CGST%</th>
+              <th>CGST Amount</th>
+              <th>IGST%</th>
+              <th>IGST Amount</th>
+              <th>Total (INR)</th>
+            </tr>
+          </thead>
+          <tbody id="invoice-table-body-${pageNumber}"></tbody>
+        </table>
+      `;
+      const tbody = page.querySelector(`#invoice-table-body-${pageNumber}`);
+      let itemIndex = startIndex;
+      for (let i = startIndex; i < endIndex && i < items.length; i++) {
+        const item = items[i];
+        const taxableValue = parseFloat(item.taxableValue) || 0;
+        const sgstRate = parseFloat(item.sgstRate) || 0;
+        const cgstRate = parseFloat(item.cgstRate) || 0;
+        const igstRate = parseFloat(item.igstRate) || 0;
+        const sgstAmt = taxableValue * sgstRate / 100 || 0;
+        const cgstAmt = taxableValue * cgstRate / 100 || 0;
+        const igstAmt = taxableValue * igstRate / 100 || 0;
+        const total = taxableValue + sgstAmt + cgstAmt + igstAmt;
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${itemIndex + 1}</td>
+          <td>${(item.description || '').replace(/\n/g, '<br>')}</td>
+          <td>${item.sacCode || ''}</td>
+          <td>${item.taxType || ''}</td>
+          <td>${taxableValue.toFixed(2)}</td>
+          <td>${sgstRate.toFixed(2)}</td>
+          <td>${sgstAmt.toFixed(2)}</td>
+          <td>${cgstRate.toFixed(2)}</td>
+          <td>${cgstAmt.toFixed(2)}</td>
+          <td>${igstRate.toFixed(2)}</td>
+          <td>${igstAmt.toFixed(2)}</td>
+          <td>${total.toFixed(2)}</td>
+        `;
+        tbody.appendChild(row);
+        itemIndex++;
+        if (item.subItems && item.subItems.length > 0) {
+          item.subItems.forEach((subItem) => {
+            const subTaxableValue = parseFloat(subItem.taxableValue) || 0;
+            const subSgstAmt = subTaxableValue * sgstRate / 100 || 0;
+            const subCgstAmt = subTaxableValue * cgstRate / 100 || 0;
+            const subIgstAmt = subTaxableValue * igstRate / 100 || 0;
+            const subTotal = subTaxableValue + subSgstAmt + subCgstAmt + subIgstAmt;
+            const subRow = document.createElement('tr');
+            subRow.innerHTML = `
+              <td></td>
+              <td>${(subItem.description || '').replace(/\n/g, '<br>')}</td>
+              <td></td>
+              <td></td>
+              <td>${subTaxableValue.toFixed(2)}</td>
+              <td>${sgstRate.toFixed(2)}</td>
+              <td>${subSgstAmt.toFixed(2)}</td>
+              <td>${cgstRate.toFixed(2)}</td>
+              <td>${subCgstAmt.toFixed(2)}</td>
+              <td>${igstRate.toFixed(2)}</td>
+              <td>${subIgstAmt.toFixed(2)}</td>
+              <td>${subTotal.toFixed(2)}</td>
+            `;
+            tbody.appendChild(subRow);
+            itemIndex++;
+          });
+        }
+      }
+      if (endIndex >= items.length) {
+        const totalRow = document.createElement('tr');
+        totalRow.innerHTML = `
+          <td colspan="11" style="text-align:right;font-weight:bold;">Total Invoice Value</td>
+          <td>${(totals.totalBeforeTax + totals.totalSGST + totals.totalCGST + totals.totalIGST).toFixed(2)}</td>
+        `;
+        tbody.appendChild(totalRow);
+        page.innerHTML += `
+          <div class="bank-section">
+            <div style="width: 60%; border: 1px solid #000; padding: 5px; font-size: 10px;">
+              <p><strong>Bank Details :</strong></p>
+              <p>Beneficiary Name : TRIPZETTA</p>
+              <p>Bank Name : YES BANK</p>
+              <p>Branch Name : EAST OF KAILASH , New Delhi-110065</p>
+              <p>IFSC CODE : YESB0000514</p>
+              <p>Current Account No : 051463700000043</p>
+            </div>
+            <div style="width: 40%; border: 1px solid #000; border-left: none; font-size: 10px;">
+              <table style="width:100%; border-collapse: collapse;">
+                <tr><td style="border: 1px solid #000; padding: 4px;">Total Amount Before Tax</td><td style="border: 1px solid #000; padding: 4px;">${totals.totalBeforeTax.toFixed(2)}</td></tr>
+                <tr><td style="border: 1px solid #000; padding: 4px;">Add : SGST @ 9%</td><td style="border: 1px solid #000; padding: 4px;">${totals.totalSGST.toFixed(2)}</td></tr>
+                <tr><td style="border: 1px solid #000; padding: 4px;">Add : CGST @ 9%</td><td style="border: 1px solid #000; padding: 4px;">${totals.totalCGST.toFixed(2)}</td></tr>
+                <tr><td style="border: 1px solid #000; padding: 4px;">Add : IGST @ 18%</td><td style="border: 1px solid #000; padding: 4px;">${totals.totalIGST.toFixed(2)}</td></tr>
+                <tr><td style="border: 1px solid #000; padding: 4px;">Rounding</td><td style="border: 1px solid #000; padding: 4px;">${totals.rounding.toFixed(2)}</td></tr>
+                <tr><td style="border: 1px solid #000; padding: 4px;"><strong>Total Invoice Value</strong></td><td style="border: 1px solid #000; padding: 4px;">${totals.roundedTotal.toFixed(2)}</td></tr>
+              </table>
+            </div>
+          </div>
+          <div style="width: 100%; border: 1px solid #000; border-top: none; font-size: 10px; padding: 4px;">
+            <strong>Total Invoice Value ( In Words ) :</strong> <span>${numberToWords(totals.roundedTotal)}</span>
+          </div>
+          <div style="width: 100%; border: 1px solid #000; border-top: none; font-size: 10px; padding: 4px;">
+            <p><strong>Terms & Conditions :</strong></p>
+            <ul style="margin: 4px 0 4px 15px; padding-left: 0;">
+              <li>CHEQUE/NEFT/RTGS should be in favour of TRIPZETTA</li>
+              <li>Any refunds or claims are subject to the cancellation policy of the booking as per rules.</li>
+              <li>All disputes are subject to jurisdiction of Delhi courts.</li>
+              <li>Interest @ 18% p.a. will be charged on overdue bills.</li>
+            </ul>
+          </div>
+          <div style="width: 100%; border: 1px solid #000; border-top: none; display: flex; justify-content: flex-end; font-size: 10px; padding: 4px;">
+            <div style="text-align: right;">
+              <p>For TRIPZETTA</p>
+              <img src="sign.png" class="logo" alt="Tripzetta Logo">
+              <p>Authorised Signatory</p>
+            </div>
+          </div>
+        `;
+      }
+      return page;
+    }
+
+    async function saveInvoice(invoiceId, invoiceData, totals) {
+      try {
+        // Save to invoices collection (for dashboard)
+        const invoiceDoc = {
+          ...invoiceData,
+          total: totals.roundedTotal || 0,
+          status: 'active',
+          timestamp: new Date()
+        };
+        await setDoc(doc(db, 'invoices', invoiceId), invoiceDoc);
+
+        // Save to saved_invoices (for tracking)
+        const savedInvoice = {
+          invoiceId,
+          invoiceNo: invoiceData.invoiceNo || '',
+          date: invoiceData.date || '',
+          customerName: invoiceData.customerName || '',
+          totalAmount: totals.roundedTotal || 0,
+          status: 'active',
+          timestamp: new Date()
+        };
+        await addDoc(collection(db, 'saved_invoices'), savedInvoice);
+
+        alert('Invoice saved successfully.');
+        window.location.href = 'index.html';
+      } catch (error) {
+        console.error('Error saving invoice:', error);
+        alert('Failed to save invoice.');
+      }
+    }
+
+    async function loadInvoice(invoiceId) {
+      try {
+        const docRef = doc(db, 'invoices', invoiceId);
+        const docSnap = await getDoc(docRef);
+        if (!docSnap.exists()) {
+          alert('Invoice not found.');
+          return;
+        }
+        const invoiceData = docSnap.data();
+        const items = invoiceData.items || [];
+        let totalBeforeTax = 0;
+        let totalSGST = 0;
+        let totalCGST = 0;
+        let totalIGST = 0;
+        items.forEach(item => {
+          const taxableValue = parseFloat(item.taxableValue) || 0;
+          const sgstRate = parseFloat(item.sgstRate) || 0;
+          const cgstRate = parseFloat(item.cgstRate) || 0;
+          const igstRate = parseFloat(item.igstRate) || 0;
+          let sgstAmt = taxableValue * sgstRate / 100 || 0;
+          let cgstAmt = taxableValue * cgstRate / 100 || 0;
+          let igstAmt = taxableValue * igstRate / 100 || 0;
+          totalBeforeTax += taxableValue;
+          totalSGST += sgstAmt;
+          totalCGST += cgstAmt;
+          totalIGST += igstAmt;
+          if (item.subItems && item.subItems.length > 0) {
+            item.subItems.forEach(subItem => {
+              const subTaxableValue = parseFloat(subItem.taxableValue) || 0;
+              sgstAmt = subTaxableValue * sgstRate / 100 || 0;
+              cgstAmt = subTaxableValue * cgstRate / 100 || 0;
+              igstAmt = subTaxableValue * igstRate / 100 || 0;
+              totalBeforeTax += subTaxableValue;
+              totalSGST += sgstAmt;
+              totalCGST += cgstAmt;
+              totalIGST += igstAmt;
+            });
+          }
+        });
+        const grossTotal = totalBeforeTax + totalSGST + totalCGST + totalIGST;
+        const roundedTotal = Math.round(grossTotal);
+        const rounding = roundedTotal - grossTotal;
+        const totals = {
+          totalBeforeTax,
+          totalSGST,
+          totalCGST,
+          totalIGST,
+          rounding,
+          roundedTotal
+        };
+        const pagesContainer = document.getElementById('invoice-pages');
+        pagesContainer.innerHTML = '';
+        const maxContentHeight = 250;
+        let currentPage = 1;
+        let currentItemIndex = 0;
+        let currentHeight = 0;
+        const rowHeight = 5;
+        const headerHeight = 25;
+        const footerHeight = 25;
+        while (currentItemIndex < items.length) {
+          let itemsInPage = [];
+          currentHeight = headerHeight;
+          while (currentItemIndex < items.length && currentHeight + rowHeight <= maxContentHeight - footerHeight) {
+            itemsInPage.push(items[currentItemIndex]);
+            currentHeight += rowHeight;
+            if (items[currentItemIndex].subItems && items[currentItemIndex].subItems.length) {
+              currentHeight += items[currentItemIndex].subItems.length * rowHeight;
+            }
+            currentItemIndex++;
+          }
+          const pageContent = createPageContent(currentPage, invoiceData, items, currentItemIndex - itemsInPage.length, currentItemIndex, totals);
+          pagesContainer.appendChild(pageContent);
+          currentPage++;
+        }
+        document.getElementById('save-btn').dataset.invoiceId = invoiceId;
+        document.getElementById('save-btn').dataset.invoiceData = JSON.stringify(invoiceData);
+        document.getElementById('save-btn').dataset.totals = JSON.stringify(totals);
+      } catch (error) {
+        console.error('Error loading invoice:', error);
+        alert('Failed to load invoice data.');
+      }
+    }
+
+    document.getElementById('download-btn').addEventListener('click', async function() {
+      try {
+        const pages = document.getElementsByClassName('invoice-page');
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = pdf.internal.pageSize.getHeight();
+        for (let i = 0; i < pages.length; i++) {
+          const canvas = await html2canvas(pages[i], { scale: 2 });
+          const imgData = canvas.toDataURL('image/png');
+          if (i > 0) {
+            pdf.addPage();
+          }
+          pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+        }
+        pdf.save('invoice.pdf');
+      } catch (error) {
+        console.error('Error generating PDF:', error);
+        alert('Failed to generate PDF.');
+      }
+    });
+
+    document.getElementById('save-btn').addEventListener('click', async function() {
+      const invoiceId = this.dataset.invoiceId;
+      const invoiceData = JSON.parse(this.dataset.invoiceData);
+      const totals = JSON.parse(this.dataset.totals);
+      await saveInvoice(invoiceId, invoiceData, totals);
+    });
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const invoiceId = urlParams.get('invoiceId');
+    if (invoiceId) {
+      loadInvoice(invoiceId);
+    } else {
+      alert('No invoice ID provided. Please create or select an invoice.');
+    }
+  </script>
+</body>
+</html>

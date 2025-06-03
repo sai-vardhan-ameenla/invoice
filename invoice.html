@@ -3,195 +3,338 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Invoice Replica</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Purchase Records</title>
+  <script type="module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"></script>
+  <script type="module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js"></script>
   <style>
+    * {
+      box-sizing: border-box;
+    }
     body {
-      font-family: Arial, sans-serif;
-      font-size: 12px;
       margin: 0;
       padding: 0;
-      color: #000;
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
     }
-    .container {
-      width: 960px;
-      margin: 20px auto;
+    .tabs {
+      display: flex;
+      justify-content: center;
+      margin: 20px 0;
+    }
+    .tab {
+      padding: 10px 20px;
+      cursor: pointer;
+      background: #ddd;
+      margin: 0 5px;
+      border-radius: 5px;
+      text-decoration: none;
+      color: black;
+    }
+    .tab.active {
+      background: #007bff;
+      color: white;
+    }
+    .purchase-form-container {
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
       padding: 20px;
-      border: 1px solid #000;
+      background: white;
+      border: 1px solid #ccc;
     }
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 1px solid #000;
-      padding-bottom: 10px;
-    }
-    .header img {
-      height: 40px;
-    }
-    .section {
-      display: flex;
-      justify-content: space-between;
-      margin-top: 10px;
-    }
-    .section div {
-      width: 48%;
-    }
-    .table-container {
+    .purchase-list {
       margin-top: 20px;
     }
-    table {
+    .purchase-list table {
       width: 100%;
       border-collapse: collapse;
     }
-    table, th, td {
-      border: 1px solid #000;
+    .purchase-list th, .purchase-list td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
     }
-    th, td {
+    .purchase-list th {
+      background-color: #f2f2f2;
+    }
+    @media screen and (max-width: 768px) {
+      .purchase-form-container {
+        padding: 10px;
+      }
+      table {
+        font-size: 8px;
+      }
+    }
+    form {
+      width: 100%;
+      max-width: 794px;
+      min-width: 200px;
+      margin: 20px auto;
+      padding: 20px;
+      background: #fff;
+      border: 1px solid #ccc;
+    }
+    label {
+      display: block;
+      margin: 10px 0 5px;
+    }
+    input, textarea {
+      width: 100%;
+      max-width: 400px;
       padding: 5px;
-      text-align: center;
+      margin-bottom: 10px;
     }
-    .right-align {
-      text-align: right;
+    input[type="radio"] {
+      width: auto;
+      margin-right: 10px;
     }
-    .bold {
-      font-weight: bold;
+    .radio-group {
+      margin: 10px 0;
     }
-    .note, .terms {
-      font-size: 10px;
-      margin-top: 10px;
+    #payment-method {
+      display: none;
     }
-    .terms span {
-      color: red;
-      font-weight: bold;
+    .form-btn {
+      display: block;
+      width: 90%;
+      max-width: 300px;
+      margin: 10px auto;
+      padding: 10px;
+      font-size: 14px;
+      cursor: pointer;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
     }
-    .digital-signature {
-      margin-top: 30px;
-      font-size: 10px;
-      text-align: right;
+    #reset-purchase-btn {
+      background: #ff4d4d;
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <img src="https://www.travelboutiqueonline.com/images/logo.png" alt="Logo">
-      <div>
-        <div><strong>Invoice No:</strong> IW/2526/693414</div>
-        <div><strong>Invoice Date:</strong> 01-Jun-2025</div>
-        <div><strong>PNR:</strong> 1G-CFBT82</div>
-      </div>
-    </div>
+  <div class="tabs">
+    <a class="tab" href="index.html">Back to Dashboard</a>
+    <a class="tab" href="create-invoice.html">Create Invoice</a>
+    <a class="tab" href="invoice-preview.html">Invoice Preview</a>
+    <div class="tab active" data-tab="purchases">Purchase Records</div>
+  </div>
 
-    <div class="section">
-      <div>
-        <strong>TBO Tek Limited</strong><br>
-        Regd Office: E-78, South Extn Part – I, New Delhi 110049<br>
-        Corp Off: Plot No 728, Udyog Vihar Phase-V,Gurgaon 122016<br>
-        Email: info@travelboutiqueonline.com<br>
-        Web: www.travelboutiqueonline.com<br>
-        Phone: 0124-4998999<br>
-        State: Haryana<br>
-        GSTIN: 06AACCT6269K1ZZ<br>
-        CIN Number: L74999DL2006PLC155233<br>
-        PAN: AACCT6269K
+  <div class="purchase-form-container" id="purchases">
+    <h2>Purchase Records</h2>
+    <form id="purchase-form">
+      <label for="purchase-date">Purchase Date:</label>
+      <input type="date" id="purchase-date" name="purchase-date" required>
+      <label>Payment Type:</label>
+      <div class="radio-group">
+        <input type="radio" id="payment-credit" name="payment-type" value="credit" required>
+        <label for="payment-credit">Credit</label>
+        <input type="radio" id="payment-cash" name="payment-type" value="cash">
+        <label for="payment-cash">Cash</label>
       </div>
-      <div>
-        <strong>Tripzetta(LUH)</strong><br>
-        Owner’s Name: SAYUSH ANAND<br>
-        FOURTH FLOOR 408<br>
-        DEVIKA TOWER-6 NEHRU PLACE110019<br>
-        accounts@tripzetta.com<br>
-        Phone: 01612405412<br>
-        State: Delhi<br>
-        GSTIN: 07ADPPA8620A1ZL<br>
-        PAN: adppa8620a
-      </div>
-    </div>
-
-    <h3 style="text-align:center; margin-top: 10px;">Invoice</h3>
-
-    <div class="table-container">
+      <label for="payment-method" id="payment-method-label">Payment Method (if Cash):</label>
+      <input type="text" id="payment-method" name="payment-method" placeholder="e.g., UPI, Card">
+      <label for="passenger-names">Passenger Names:</label>
+      <textarea id="passenger-names" name="passenger-names" required></textarea>
+      <label for="hotel-booked">Hotel Booked:</label>
+      <input type="text" id="hotel-booked" name="hotel-booked" required>
+      <label for="service-description">Service Description:</label>
+      <textarea id="service-description" name="service-description" required></textarea>
+      <label for="commission">Commission (INR):</label>
+      <input type="number" id="commission" name="commission" step="0.01" required>
+      <label for="tds">TDS (INR):</label>
+      <input type="number" id="tds" name="tds" step="0.01" required>
+      <label for="gross-amount">Gross Amount (INR):</label>
+      <input type="number" id="gross-amount" name="gross-amount" step="0.01" required>
+      <label for="net-amount">Net Amount (INR):</label>
+      <input type="number" id="net-amount" name="net-amount" step="0.01" readonly>
+      <button type="button" class="form-btn" id="save-purchase-btn">Save Purchase</button>
+      <button type="button" class="form-btn" id="reset-purchase-btn">Reset Form</button>
+    </form>
+    <h3>Purchase List</h3>
+    <div class="purchase-list">
       <table>
         <thead>
           <tr>
-            <th>S No.</th><th>Ticket No</th><th>Sectors</th><th>Flight</th><th>PAX Name</th><th>Type</th><th>Class</th><th>Fare</th><th>OT Tax</th><th>K3/GST</th><th>YQ Tax</th><th>YR Tax</th><th>Bag.Ch.</th><th>Meal Ch.</th><th>Seat Ch.</th><th>Sp Service Ch.</th><th>Global Pr. Ch.</th>
+            <th>Purchase ID</th>
+            <th>Date</th>
+            <th>Payment Type</th>
+            <th>Payment Method</th>
+            <th>Passengers</th>
+            <th>Hotel</th>
+            <th>Service</th>
+            <th>Commission</th>
+            <th>TDS</th>
+            <th>Gross</th>
+            <th>Net</th>
           </tr>
         </thead>
-        <tbody>
-          <tr><td>1</td><td>1082865383916</td><td>KEF-CDG</td><td>F542</td><td>MrVivekLadia</td><td>ADT</td><td>V</td><td>19,950.00</td><td>3,316.00</td><td>0.00</td><td>4,835.00</td><td>0.00</td><td>0.00</td><td>0.00</td><td>0.00</td><td>0.00</td><td>0.00</td></tr>
-          <tr><td>2</td><td>1082865383917</td><td>KEF-CDG</td><td>F542</td><td>MsNidhiLadia</td><td>ADT</td><td>V</td><td>19,950.00</td><td>3,316.00</td><td>0.00</td><td>4,835.00</td><td>0.00</td><td>0.00</td><td>0.00</td><td>0.00</td><td>0.00</td><td>0.00</td></tr>
-          <tr><td>3</td><td>1082865383918</td><td>KEF-CDG</td><td>F542</td><td>MsHehkalLadia</td><td>ADT</td><td>V</td><td>19,950.00</td><td>3,316.00</td><td>0.00</td><td>4,835.00</td><td>0.00</td><td>0.00</td><td>0.00</td><td>0.00</td><td>0.00</td><td>0.00</td></tr>
-          <tr><td>4</td><td>1082865383919</td><td>KEF-CDG</td><td>F542</td><td>MsMahikkaLadia</td><td>ADT</td><td>V</td><td>19,950.00</td><td>3,316.00</td><td>0.00</td><td>4,835.00</td><td>0.00</td><td>0.00</td><td>0.00</td><td>0.00</td><td>0.00</td><td>0.00</td></tr>
-        </tbody>
+        <tbody id="purchase-list-body"></tbody>
       </table>
     </div>
-
-    <div class="note">Note: * Voidaation and Refund as per fare rules</div>
-
-    <div class="section" style="margin-top:20px;">
-      <div>
-        <strong>Billed by :</strong> Travel Boutique Online<br>
-        <strong>Ticketed By :</strong> System Service<br>
-        <strong>Invoice Status :</strong> Raised<br>
-        <strong>Agent Remarks :</strong> -
-      </div>
-      <div class="right-align">
-        <strong>Gross:</strong> 111604.00<br>
-        <strong>Less :</strong> Commission Earned 00.00<br>
-        Add : Tra Fee 00.00<br>
-        Add : TDS Deducted 00.00<br>
-        Add : CGST @0% 0.00<br>
-        Add : SGST @0% 0.00<br>
-        Add : IGST @18% 0.00<br>
-        <strong>Net Amount:</strong> 111604.00<br>
-        Net Receivable: 111604.00<br>
-        <span style="font-size: 10px;">Note : (Amount in ₹)</span>
-      </div>
-    </div>
-
-    <h4>GST Details :</h4>
-    <table>
-      <thead>
-        <tr>
-          <th>Service Description</th><th>SAC</th><th>Taxable Value</th><th>CGST @ 0%</th><th>SGST @ 0%</th><th>IGST @ 18%</th><th>Total</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr><td>Transaction Fees</td><td>9985</td><td>0.00</td><td>0</td><td>0</td><td>0.00</td><td>0.00</td></tr>
-      </tbody>
-    </table>
-
-    <h4>Passenger GST Details:</h4>
-    <table>
-      <thead>
-        <tr>
-          <th>Lead Pax Name</th><th>GST Number</th><th>GST Company Contact Number</th><th>GST Company Address</th><th>GST Company Email</th><th>GST Company Name</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr><td>MrVivekLadia</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
-      </tbody>
-    </table>
-
-    <div class="terms">
-      <p><span>Terms & Conditions :</span></p>
-      <p>
-        <strong>IMP :</strong> This is computer generated invoice signature not required<br>
-        <strong>IMP :</strong> All Cases & Disputes are subject to New Delhi Jurisdiction.<br>
-        <strong>IMP :</strong> Refunds & Cancellations are subject to Airlines approval.<br>
-        <strong>IMP :</strong> Service charges as included above are to be collected from the customers on our behalf.<br>
-        <strong>CHEQUE :</strong> Must be drawn in favour of ‘TRAVEL BOUTIQUE ONLINE’.<br>
-        <strong>LATE PAYMENT :</strong> Interest @ 24% per annum will be charged on all outstanding bills after due date.<br>
-        <strong>VERY IMP :</strong> Kindly check all details carefully to avoid un-necessary complications.
-      </p>
-    </div>
-
-    <div class="digital-signature">
-      Digitally signed by: travelboutiqueonline.com<br>
-      Date: 2025.06.01 17:57:16 +05:30<br>
-      Reason: DLF Gurgaon<br>
-      Location: TBO Tek Limited
-    </div>
   </div>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+    import { getFirestore, collection, addDoc, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAT3oqplHoUuZrDNrnZbQ-hoUChLLEdmV4",
+      authDomain: "saas-restaurant-vardhan.firebaseapp.com",
+      projectId: "saas-restaurant-vardhan",
+      storageBucket: "saas-restaurant-vardhan.appspot.com",
+      messagingSenderId: "1019077493371",
+      appId: "1:1019077493371:web:2c92f2c902e34b05c358de"
+    };
+
+    let db;
+    try {
+      const app = initializeApp(firebaseConfig);
+      db = getFirestore(app);
+    } catch (error) {
+      console.error('Error initializing Firebase:', error);
+      alert('Failed to initialize Firebase. Please check your configuration.');
+    }
+
+    async function generatePurchaseId() {
+      try {
+        const querySnapshot = await getDocs(collection(db, 'purchases'));
+        let maxNumber = 0;
+        querySnapshot.forEach(doc => {
+          const purchaseId = doc.data().purchaseId || '';
+          if (purchaseId.startsWith('PUR-')) {
+            const number = parseInt(purchaseId.replace('PUR-', '')) || 0;
+            if (number > maxNumber) maxNumber = number;
+          }
+        });
+        const nextNumber = maxNumber + 1;
+        return `PUR-${nextNumber.toString().padStart(4, '0')}`;
+      } catch (error) {
+        console.error('Error generating purchase ID:', error);
+        alert('Error generating purchase ID.');
+        return 'PUR-0001';
+      }
+    }
+
+    async function resetPurchaseForm() {
+      const form = document.getElementById('purchase-form');
+      form.reset();
+      document.getElementById('payment-method').style.display = 'none';
+      document.getElementById('payment-method-label').style.display = 'none';
+      document.getElementById('net-amount').value = '';
+      document.getElementById('payment-credit').checked = false;
+      document.getElementById('payment-cash').checked = false;
+    }
+
+    async function savePurchase(purchaseData) {
+      try {
+        purchaseData.purchaseId = await generatePurchaseId();
+        await addDoc(collection(db, 'purchases'), purchaseData);
+        alert('Purchase saved successfully.');
+        return true;
+      } catch (error) {
+        console.error('Error saving purchase:', error);
+        alert('Failed to save purchase.');
+        return false;
+      }
+    }
+
+    async function updatePurchaseList() {
+      if (!db) {
+        alert('Firestore is not initialized.');
+        return;
+      }
+      const purchaseListBody = document.getElementById('purchase-list-body');
+      purchaseListBody.innerHTML = '';
+      try {
+        const querySnapshot = await getDocs(collection(db, 'purchases'));
+        querySnapshot.forEach(doc => {
+          const purchase = doc.data();
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${purchase.purchaseId || ''}</td>
+            <td>${purchase.purchaseDate || ''}</td>
+            <td>${purchase.paymentType || ''}</td>
+            <td>${purchase.paymentMethod || '-'}</td>
+            <td>${(purchase.passengerNames || '').replace(/\n/g, '<br>')}</td>
+            <td>${purchase.hotelBooked || ''}</td>
+            <td>${(purchase.serviceDescription || '').replace(/\n/g, '<br>')}</td>
+            <td>Rs. ${(purchase.commission || 0).toFixed(2)}</td>
+            <td>Rs. ${(purchase.tds || 0).toFixed(2)}</td>
+            <td>Rs. ${(purchase.grossAmount || 0).toFixed(2)}</td>
+            <td>Rs. ${(purchase.netAmount || 0).toFixed(2)}</td>
+          `;
+          purchaseListBody.appendChild(row);
+        });
+      } catch (error) {
+        console.error('Error fetching purchases:', error);
+        alert('Failed to load purchase data.');
+      }
+    }
+
+    document.getElementById('payment-credit').addEventListener('change', function() {
+      document.getElementById('payment-method').style.display = 'none';
+      document.getElementById('payment-method-label').style.display = 'none';
+      document.getElementById('payment-method').value = '';
+    });
+
+    document.getElementById('payment-cash').addEventListener('change', function() {
+      document.getElementById('payment-method').style.display = 'block';
+      document.getElementById('payment-method-label').style.display = 'block';
+    });
+
+    function calculateNetAmount() {
+      const commission = parseFloat(document.getElementById('commission').value) || 0;
+      const tds = parseFloat(document.getElementById('tds').value) || 0;
+      const gross = parseFloat(document.getElementById('gross-amount').value) || 0;
+      const net = gross - commission + tds;
+      document.getElementById('net-amount').value = net.toFixed(2);
+    }
+
+    document.getElementById('commission').addEventListener('input', calculateNetAmount);
+    document.getElementById('tds').addEventListener('input', calculateNetAmount);
+    document.getElementById('gross-amount').addEventListener('input', calculateNetAmount);
+
+    document.getElementById('save-purchase-btn').addEventListener('click', async function() {
+      const form = document.getElementById('purchase-form');
+      if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+      }
+      const paymentType = document.querySelector('input[name="payment-type"]:checked')?.value;
+      if (!paymentType) {
+        alert('Please select a payment type.');
+        return;
+      }
+      const purchaseData = {
+        purchaseDate: document.getElementById('purchase-date').value,
+        paymentType: paymentType,
+        paymentMethod: paymentType === 'cash' ? document.getElementById('payment-method').value : '',
+        passengerNames: document.getElementById('passenger-names').value,
+        hotelBooked: document.getElementById('hotel-booked').value,
+        serviceDescription: document.getElementById('service-description').value,
+        commission: parseFloat(document.getElementById('commission').value) || 0,
+        tds: parseFloat(document.getElementById('tds').value) || 0,
+        grossAmount: parseFloat(document.getElementById('gross-amount').value) || 0,
+        netAmount: parseFloat(document.getElementById('net-amount').value) || 0
+      };
+      const saved = await savePurchase(purchaseData);
+      if (saved) {
+        await resetPurchaseForm();
+        await updatePurchaseList();
+      }
+    });
+
+    document.getElementById('reset-purchase-btn').addEventListener('click', async function() {
+      await resetPurchaseForm();
+    });
+
+    // Initialize the page
+    (async () => {
+      await resetPurchaseForm();
+      await updatePurchaseList();
+    })();
+  </script>
 </body>
 </html>
