@@ -4,12 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta charset="UTF-8">
   <title>Invoice Preview</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <script type="https://www.gstatic.com/module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"></script>
-  <script type="https://www.gstatic.com/module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js"></script>
+  <script type="module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"></script>
+  <script type="module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js"></script>
   <style>
     * {
       box-sizing: border-box;
@@ -64,30 +63,27 @@
         size: A4;
         margin: 0;
       }
-      body * {
-        visibility: hidden;
+      body, body * {
+        visibility: hidden !important;
       }
-      .invoice-page, .invoice-page * {
-        visibility: visible;
+      .invoice-preview, .invoice-page, .invoice-page * {
+        visibility: visible !important;
       }
       .invoice-page {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 210mm;
-        min-height: 297mm;
-        margin: 0;
-        padding: 5mm;
-        border: none;
-        box-sizing: border-box;
-        transform: scale(1);
-        transform-origin: top left;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 210mm !important;
+        min-height: 297mm !important;
+        margin: 0 !important;
+        padding: 5mm !important;
+        border: none !important;
+        box-sizing: border-box !important;
+        transform: scale(1) !important;
+        transform-origin: top left !important;
       }
-      .download-btn, #save-btn, #manual-print-btn {
-        display: none;
-      }
-      .tabs {
-        display: none;
+      .download-btn, #save-btn, #manual-print-btn, .tabs {
+        display: none !important;
       }
     }
     @media screen and (max-width: 768px) {
@@ -99,6 +95,15 @@
       }
       .invoice-preview {
         padding: 10px;
+      }
+      .logo {
+        height: 30px;
+      }
+      table {
+        font-size: 8px;
+      }
+      .bank-section, .terms, .signature, .right-info {
+        font-size: 8px;
       }
     }
     .header {
@@ -267,7 +272,7 @@
               <p><strong>GSTIN :</strong> 07APDPA8620A1ZL</p>
               <p><strong>PAN :</strong> APDPA8620A</p>
               <p><strong>Regd. Address :</strong> 408 4th Floor Devika Tower Nehru Place New Delhi</p>
-              <p><strong>Contact:</strong> +919650515130</p>
+              <p><strong>Contact:</strong> +919650485130</p>
             </div>
           </div>
         </div>
@@ -339,7 +344,7 @@
               <td>${cgstRate.toFixed(2)}</td>
               <td>${subCgstAmt.toFixed(2)}</td>
               <td>${igstRate.toFixed(2)}</td>
-              <td>${subIgstAmt.toFixed(2)}</td>
+              <td>${igstAmt.toFixed(2)}</td>
               <td>${subTotal.toFixed(2)}</td>
             `;
             tbody.appendChild(subRow);
@@ -523,14 +528,20 @@
       });
     }
 
+    function isMobileDevice() {
+      return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    }
+
     function triggerPrint() {
       console.log('Triggering print dialog');
       try {
         window.print();
+        return true;
       } catch (error) {
         console.error('Error triggering print:', error);
         alert('Failed to open print dialog. Please use the manual print button.');
         document.getElementById('manual-print-btn').style.display = 'block';
+        return false;
       }
     }
 
@@ -542,6 +553,12 @@
         return;
       }
       try {
+        const pagesContainer = document.getElementById('invoice-pages');
+        if (!pagesContainer.querySelector('.invoice-page')) {
+          console.error('No invoice pages rendered, showing manual print');
+          document.getElementById('manual-print-btn').style.display = 'block';
+          return;
+        }
         const images = document.querySelectorAll('img');
         const imagePromises = Array.from(images).map(img => {
           return new Promise(resolve => {
@@ -562,16 +579,20 @@
         });
         console.log(`Waiting for ${imagePromises.length} images to load`);
         await Promise.all(imagePromises);
-        console.log('All images loaded, delaying print by 2 seconds');
+        console.log('All images loaded, delaying print by 3 seconds');
         setTimeout(() => {
-          triggerPrint();
-        }, 2000);
+          const printSuccess = triggerPrint();
+          if (!printSuccess && isMobileDevice()) {
+            console.log('Mobile print failed, showing manual print button immediately');
+            document.getElementById('manual-print-btn').style.display = 'block';
+          }
+        }, 3000);
         setTimeout(() => {
-          if (document.getElementById('invoice-pages').children.length > 0) {
+          if (pagesContainer.children.length > 0 && document.getElementById('manual-print-btn').style.display === 'none') {
             console.log('Print dialog not confirmed, showing manual print button');
             document.getElementById('manual-print-btn').style.display = 'block';
           }
-        }, 7000); // Adjusted for 2-second delay + 5 seconds
+        }, 8000); // Adjusted for 3-second delay + 5 seconds
       } catch (error) {
         console.error('Error in handleAutoPrint:', error);
         alert('Failed to prepare for printing. Please use the manual print button.');
@@ -579,9 +600,14 @@
       }
     }
 
+    let printAttempted = false;
     window.addEventListener('afterprint', () => {
-      console.log('Print dialog closed, redirecting to index.html');
-      window.location.href = 'index.html';
+      if (printAttempted) {
+        console.log('Print dialog closed, redirecting to index.html');
+        window.location.href = 'index.html';
+      } else {
+        console.log('afterprint triggered without print attempt, ignoring');
+      }
     });
 
     document.getElementById('download-btn').addEventListener('click', async () => {
@@ -618,6 +644,7 @@
 
     document.getElementById('manual-print-btn').addEventListener('click', () => {
       console.log('Manual print button clicked');
+      printAttempted = true;
       triggerPrint();
     });
 
@@ -631,9 +658,13 @@
           if (loaded) {
             console.log('Invoice loaded, handling auto-print');
             await handleAutoPrint();
+          } else {
+            console.log('Invoice load failed, showing manual print');
+            document.getElementById('manual-print-btn').style.display = 'block';
           }
         } catch (error) {
           console.error('Failed to load invoice:', error);
+          document.getElementById('manual-print-btn').style.display = 'block';
         }
       } else {
         console.log('No invoice ID provided, displaying message and redirecting');
