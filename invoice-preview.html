@@ -4,11 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta charset="UTF-8">
   <title>Invoice Preview</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <script type="module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"></script>
-  <script type="module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js"></script>
+  <script type="https://www.gstatic.com/module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"></script>
+  <script type="https://www.gstatic.com/module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js"></script>
   <style>
     * {
       box-sizing: border-box;
@@ -161,6 +162,12 @@
       text-align: right;
       margin-top: 5px;
     }
+    .error-message {
+      text-align: center;
+      font-size: 16px;
+      color: #ff4d4d;
+      margin: 20px 0;
+    }
   </style>
 </head>
 <body>
@@ -260,7 +267,7 @@
               <p><strong>GSTIN :</strong> 07APDPA8620A1ZL</p>
               <p><strong>PAN :</strong> APDPA8620A</p>
               <p><strong>Regd. Address :</strong> 408 4th Floor Devika Tower Nehru Place New Delhi</p>
-              <p><strong>Contact:</strong> +919650485130</p>
+              <p><strong>Contact:</strong> +919650515130</p>
             </div>
           </div>
         </div>
@@ -555,14 +562,16 @@
         });
         console.log(`Waiting for ${imagePromises.length} images to load`);
         await Promise.all(imagePromises);
-        console.log('All images loaded');
-        triggerPrint();
+        console.log('All images loaded, delaying print by 2 seconds');
+        setTimeout(() => {
+          triggerPrint();
+        }, 2000);
         setTimeout(() => {
           if (document.getElementById('invoice-pages').children.length > 0) {
             console.log('Print dialog not confirmed, showing manual print button');
             document.getElementById('manual-print-btn').style.display = 'block';
           }
-        }, 5000);
+        }, 7000); // Adjusted for 2-second delay + 5 seconds
       } catch (error) {
         console.error('Error in handleAutoPrint:', error);
         alert('Failed to prepare for printing. Please use the manual print button.');
@@ -627,8 +636,16 @@
           console.error('Failed to load invoice:', error);
         }
       } else {
-        console.error('No invoice ID provided');
-        alert('No invoice ID provided. Please create or select an invoice.');
+        console.log('No invoice ID provided, displaying message and redirecting');
+        const pagesContainer = document.getElementById('invoice-pages');
+        pagesContainer.innerHTML = '<div class="error-message">Please select an invoice from the dashboard. Redirecting in 3 seconds...</div>';
+        document.getElementById('download-btn').style.display = 'none';
+        document.getElementById('save-btn').style.display = 'none';
+        document.getElementById('manual-print-btn').style.display = 'none';
+        setTimeout(() => {
+          console.log('Redirecting to index.html due to missing invoiceId');
+          window.location.href = 'index.html';
+        }, 3000);
       }
     })();
   </script>
