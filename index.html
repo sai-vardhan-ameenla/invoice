@@ -7,6 +7,7 @@
   <title>Invoice Generator Dashboard</title>
   <script type="module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"></script>
   <script type="module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <style>
     * {
       box-sizing: border-box;
@@ -124,7 +125,7 @@
     .invoice-list th {
       background-color: #f2f2f2;
     }
-    .action-btn, .cancel-btn, .edit-btn {
+    .action-btn, .cancel-btn, .edit-btn, .whatsapp-btn {
       padding: 5px 10px;
       color: white;
       border: none;
@@ -135,7 +136,11 @@
     .action-btn { background: #007bff; }
     .cancel-btn { background: #ff8c00; }
     .edit-btn { background: #4CAF50; }
+    .whatsapp-btn { background: #25D366; }
     .canceled-row { color: #888; }
+    #pdf-container {
+      display: none;
+    }
     @media screen and (max-width: 768px) {
       .dashboard { padding: 10px; }
       .stat-box { width: 48%; }
@@ -274,6 +279,7 @@
       </table>
     </div>
     <button class="download-report-btn" onclick="downloadReport()">Download Report</button>
+    <div id="pdf-container"></div>
   </div>
 
   <script type="module">
@@ -296,6 +302,301 @@
     } catch (error) {
       console.error('Error initializing Firebase:', error);
       alert('Failed to initialize Firebase. Please check your configuration.');
+    }
+
+    // Utility: Sanitize HTML to prevent XSS
+    function sanitizeHTML(str) {
+      const div = document.createElement('div');
+      div.textContent = str || '';
+      return div.innerHTML;
+    }
+
+    // Utility: Normalize phone number to E.164 format
+    function normalizePhoneNumber(phone) {
+      if (!phone) return '';
+      let cleaned = phone.replace(/\D/g, '');
+      if (cleaned.length === 10 && !cleaned.startsWith('+91')) {
+        cleaned = `+91${cleaned}`;
+      }
+      return cleaned.startsWith('+') ? cleaned : '';
+    }
+
+    // Utility: Generate invoice HTML for PDF
+    function generateInvoiceHTML(invoiceData, totals) {
+      const isTaxInvoice = invoiceData.invoiceType === 'tax' || !invoiceData.invoiceType;
+      const items = invoiceData.items || [];
+      let html = `
+        <style>
+          body { font-family: Arial, sans-serif; font-size: 10px; }
+          .invoice-page { width: 210mm; padding: 10mm; border: 1px solid #000; }
+          .header { display: flex; justify-content: space-between; }
+          .title { font-size: 20px; font-weight: bold; }
+          .section { margin-bottom: 10px; }
+          .bold { font-weight: bold; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+          th, td { border: 1px solid #000; padding: 4px; text-align: left; }
+          th { background: #f8f8f8; }
+          .bank-section { display: flex; font-size: 10px; margin-top: 15px; }
+          .logo { height: 40px; }
+        </style>
+        <div class="invoice-page">
+          <div class="header">
+            <div>
+              <p class="title">${isTaxInvoice ? 'TAX INVOICE' : 'INVOICE'}</p>
+              <div class="section">
+                <p><span class="bold">Invoice Date:</span> ${sanitizeHTML(invoiceData.date)}</p>
+                <p><span class="bold">Invoice No:</span> ${sanitizeHTML(invoiceData.invoiceNo)}</p>
+                <p><span class="bold">Place of Supply:</span> ${sanitizeHTML(invoiceData.placeOfSupply)}</p>
+              </div>
+              <div class="section">
+                <p><span class="bold">Name:</span> ${sanitizeHTML(invoiceData.customerName)}</p>
+                <p><span class="bold">Address:</span> ${sanitizeHTML(invoiceData.customerAddress)}</p>
+                <p><span class="bold">GSTIN:</span> ${sanitizeHTML(invoiceData.customerGSTIN)}</p>
+                <p><span class="bold">STATE:</span> ${sanitizeHTML(invoiceData.customerState)}</p>
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <img src="image.png" class="logo" alt="Tripzetta Logo">
+              <div>
+                <p><strong>GSTIN:</strong> 07APDPA8620A1ZL</p>
+                <p><strong>PAN:</strong> APDPA8620A</p>
+                <p><strong>Regd. Address:</strong> 408 4th Floor Devika Tower Nehru Place New Delhi</p>
+                <p><strong>Contact:</strong> +919650485130</p>
+              </div>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Service Description</th>
+                ${isTaxInvoice ? `
+                  <th>SAC Code</th>
+                  <th>Tax Type</th>
+                ` : ''}
+                <th>Taxable Value</th>
+                <th>SGST%</th>
+                <th>SGST Amount</th>
+                <th>CGST%</th>
+                <th>CGST Amount</th>
+                <th>IGST%</th>
+                <th>IGST Amount</th>
+                <th>Total (INR)</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
+      let itemIndex = 0;
+      items.forEach(item => {
+        const taxableValue = parseFloat(item.taxableValue) || 0;
+        const sgstRate = parseFloat(item.sgstRate) || 0;
+        const cgstRate = parseFloat(item.cgstRate) || 0;
+        const igstRate = parseFloat(item.igstRate) || 0;
+        const sgstAmt = taxableValue * sgstRate / 100 || 0;
+        const cgstAmt = taxableValue * cgstRate / 100 || 0;
+        const igstAmt = taxableValue * igstRate / 100 || 0;
+        const total = taxableValue + sgstAmt + cgstAmt + igstAmt;
+        html += `
+          <tr>
+            <td>${itemIndex + 1}</td>
+            <td>${sanitizeHTML(item.description).replace(/\n/g, '<br>')}</td>
+            ${isTaxInvoice ? `
+              <td>${sanitizeHTML(item.sacCode)}</td>
+              <td>${sanitizeHTML(item.taxType)}</td>
+            ` : ''}
+            <td>${taxableValue.toFixed(2)}</td>
+            <td>${sgstRate.toFixed(2)}</td>
+            <td>${sgstAmt.toFixed(2)}</td>
+            <td>${cgstRate.toFixed(2)}</td>
+            <td>${cgstAmt.toFixed(2)}</td>
+            <td>${igstRate.toFixed(2)}</td>
+            <td>${igstAmt.toFixed(2)}</td>
+            <td>${total.toFixed(2)}</td>
+          </tr>
+        `;
+        itemIndex++;
+        if (item.subItems && Array.isArray(item.subItems)) {
+          item.subItems.forEach(subItem => {
+            const subTaxableValue = parseFloat(subItem.taxableValue) || 0;
+            const subSgstAmt = subTaxableValue * sgstRate / 100 || 0;
+            const subCgstAmt = subTaxableValue * cgstRate / 100 || 0;
+            const subIgstAmt = subTaxableValue * igstRate / 100 || 0;
+            const subTotal = subTaxableValue + subSgstAmt + subCgstAmt + subIgstAmt;
+            html += `
+              <tr>
+                <td></td>
+                <td>${sanitizeHTML(subItem.description).replace(/\n/g, '<br>')}</td>
+                ${isTaxInvoice ? `
+                  <td></td>
+                  <td></td>
+                ` : ''}
+                <td>${subTaxableValue.toFixed(2)}</td>
+                <td>${sgstRate.toFixed(2)}</td>
+                <td>${subSgstAmt.toFixed(2)}</td>
+                <td>${cgstRate.toFixed(2)}</td>
+                <td>${subCgstAmt.toFixed(2)}</td>
+                <td>${igstRate.toFixed(2)}</td>
+                <td>${subIgstAmt.toFixed(2)}</td>
+                <td>${subTotal.toFixed(2)}</td>
+              </tr>
+            `;
+            itemIndex++;
+          });
+        }
+      });
+      html += `
+              <tr>
+                <td colspan="${isTaxInvoice ? 11 : 9}" style="text-align:right;font-weight:bold;">Total Invoice Value</td>
+                <td>${(totals.totalBeforeTax + totals.totalSGST + totals.totalCGST + totals.totalIGST).toFixed(2)}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="bank-section">
+            <div style="width: 60%; border: 1px solid #000; padding: 5px;">
+              <p><strong>Bank Details:</strong></p>
+              <p>Beneficiary Name: TRIPZETTA</p>
+              <p>Bank Name: YES BANK</p>
+              <p>Branch: EAST OF KAILASH, New Delhi</p>
+              <p>IFSC CODE: YESB0000514</p>
+              <p>Current Account No: 051463700000043</p>
+            </div>
+            <div style="width: 40%; border: 1px solid #000; border-left: none;">
+              <table style="width:100%; border-collapse: collapse;">
+                <tr><td style="border: 1px solid #000; padding: 4px;">Total Amount Before Tax</td><td style="border: 1px solid #000; padding: 4px;">${totals.totalBeforeTax.toFixed(2)}</td></tr>
+                <tr><td style="border: 1px solid #000; padding: 4px;">Add: SGST @ 9%</td><td style="border: 1px solid #000; padding: 4px;">${totals.totalSGST.toFixed(2)}</td></tr>
+                <tr><td style="border: 1px solid #000; padding: 4px;">Add: CGST @ 9%</td><td style="border: 1px solid #000; padding: 4px;">${totals.totalCGST.toFixed(2)}</td></tr>
+                <tr><td style="border: 1px solid #000; padding: 4px;">Add: IGST @ 18%</td><td style="border: 1px solid #000; padding: 4px;">${totals.totalIGST.toFixed(2)}</td></tr>
+                <tr><td style="border: 1px solid #000; padding: 4px;">Rounding</td><td style="border: 1px solid #000; padding: 4px;">${totals.rounding.toFixed(2)}</td></tr>
+                <tr><td style="border: 1px solid #000; padding: 4px;"><strong>Total Invoice Value</strong></td><td style="border: 1px solid #000; padding: 4px;">${totals.roundedTotal.toFixed(2)}</td></tr>
+              </table>
+            </div>
+          </div>
+          <div style="width: 100%; border: 1px solid #000; border-top: none; padding: 4px;">
+            <strong>Total Invoice Value (In Words):</strong> ${sanitizeHTML(numberToWords(totals.roundedTotal))}
+          </div>
+          <div style="width: 100%; border: 1px solid #000; border-top: none; padding: 4px;">
+            <p><strong>Terms & Conditions:</strong></p>
+            <ul style="margin: 4px 0 4px 15px; padding-left: 0;">
+              <li>CHEQUE/NEFT/RTGS should be in favour of TRIPZETTA</li>
+              <li>Any refunds or claims are subject to the cancellation policy of the booking as per rules.</li>
+              <li>All disputes are subject to jurisdiction of Delhi courts.</li>
+              <li>Interest @ 18% p.a. will be charged on overdue bills.</li>
+            </ul>
+          </div>
+          <div style="width: 100%; border: 1px solid #000; border-top: none; display: flex; justify-content: flex-end; padding: 4px;">
+            <div style="text-align: right;">
+              <p>For TRIPZETTA</p>
+              <img src="sign.png" class="logo" alt="Tripzetta Signature">
+              <p>Authorised Signatory</p>
+            </div>
+          </div>
+        </div>
+      `;
+      return html;
+    }
+
+    // Utility: Convert number to words
+    function numberToWords(num) {
+      if (!Number.isFinite(num) || num < 0) return 'Invalid Amount';
+      if (num === 0) return 'Zero Rupees Only';
+      const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+      const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+      const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+      function convertLessThanThousand(n) {
+        if (n === 0) return '';
+        if (n < 10) return ones[n];
+        if (n < 20) return teens[n - 10];
+        const ten = Math.floor(n / 10);
+        const unit = n % 10;
+        return tens[ten] + (unit ? ' ' + ones[unit] : '');
+      }
+      let words = '';
+      const crore = Math.floor(num / 10000000);
+      num %= 10000000;
+      const lakh = Math.floor(num / 100000);
+      num %= 100000;
+      const thousand = Math.floor(num / 1000);
+      num %= 1000;
+      const hundreds = Math.floor(num);
+      if (crore) words += convertLessThanThousand(crore) + ' Crore ';
+      if (lakh) words += convertLessThanThousand(lakh) + ' Lakh ';
+      if (thousand) words += convertLessThanThousand(thousand) + ' Thousand ';
+      if (hundreds) words += convertLessThanThousand(hundreds);
+      return words.trim() + ' Rupees Only';
+    }
+
+    // Generate and send PDF via WhatsApp
+    async function sendInvoiceViaWhatsApp(invoiceId) {
+      try {
+        const docRef = doc(db, 'invoices', invoiceId);
+        const docSnap = await getDoc(docRef);
+        if (!docSnap.exists()) {
+          alert('Invoice not found.');
+          return;
+        }
+        const invoiceData = docSnap.data();
+        const items = Array.isArray(invoiceData.items) ? invoiceData.items : [];
+        let totalBeforeTax = 0;
+        let totalSGST = 0;
+        let totalCGST = 0;
+        let totalIGST = 0;
+        items.forEach(item => {
+          const taxableValue = parseFloat(item.taxableValue) || 0;
+          const sgstRate = parseFloat(item.sgstRate) || 0;
+          const cgstRate = parseFloat(item.cgstRate) || 0;
+          const igstRate = parseFloat(item.igstRate) || 0;
+          const sgstAmt = taxableValue * sgstRate / 100 || 0;
+          const cgstAmt = taxableValue * cgstRate / 100 || 0;
+          const igstAmt = taxableValue * igstRate / 100 || 0;
+          totalBeforeTax += taxableValue;
+          totalSGST += sgstAmt;
+          totalCGST += cgstAmt;
+          totalIGST += igstAmt;
+          if (item.subItems && Array.isArray(item.subItems)) {
+            item.subItems.forEach(subItem => {
+              const subTaxableValue = parseFloat(subItem.taxableValue) || 0;
+              const subSgstAmt = subTaxableValue * sgstRate / 100 || 0;
+              const subCgstAmt = subTaxableValue * cgstRate / 100 || 0;
+              const subIgstAmt = subTaxableValue * igstRate / 100 || 0;
+              totalBeforeTax += subTaxableValue;
+              totalSGST += subSgstAmt;
+              totalCGST += subCgstAmt;
+              totalIGST += subIgstAmt;
+            });
+          }
+        });
+        const grossTotal = totalBeforeTax + totalSGST + totalCGST + totalIGST;
+        const roundedTotal = Math.round(grossTotal);
+        const rounding = roundedTotal - grossTotal;
+        const totals = {
+          totalBeforeTax,
+          totalSGST,
+          totalCGST,
+          totalIGST,
+          rounding,
+          roundedTotal
+        };
+        const pdfContainer = document.getElementById('pdf-container');
+        pdfContainer.innerHTML = generateInvoiceHTML(invoiceData, totals);
+        const pdfElement = pdfContainer.firstChild;
+        const opt = {
+          margin: 10,
+          filename: `Invoice_${invoiceData.invoiceNo}.pdf`,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2 },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+        await html2pdf().set(opt).from(pdfElement).save();
+        const phone = normalizePhoneNumber(invoiceData.customerPhone);
+        const message = encodeURIComponent(`Dear ${invoiceData.customerName},\nPlease find attached the invoice ${invoiceData.invoiceNo} for Rs. ${totals.roundedTotal.toFixed(2)}.\nThank you for your business!\nTRIPZETTA`);
+        const whatsappUrl = phone ? `https://wa.me/${phone}?text=${message}` : `https://wa.me/?text=${message}`;
+        window.open(whatsappUrl, '_blank');
+        alert('PDF has been downloaded. Please attach it in the opened WhatsApp chat.');
+        pdfContainer.innerHTML = '';
+      } catch (error) {
+        console.error('Error generating PDF or opening WhatsApp:', error);
+        alert('Failed to generate PDF or open WhatsApp. Please try again.');
+      }
     }
 
     const currentYear = new Date().getFullYear();
@@ -365,7 +666,7 @@
       const searchQuery = document.getElementById('search-input').value.trim().toLowerCase();
       const filterDay = document.getElementById('filter-day').value;
       const filterMonth = document.getElementById('filter-month').value;
-      const filterYear = document.getElementById('filter-year').value;
+      const filterYear = parseInt(document.getElementById('filter-year').value);
       let monthlyInvoices = 0;
       let monthlySubtotal = 0;
       let monthlyGST = 0;
@@ -397,7 +698,7 @@
           // Apply date filters
           if (filterDay && parseInt(filterDay) !== invoiceDay) return;
           if (filterMonth && parseInt(filterMonth) !== invoiceMonth) return;
-          if (filterYear && parseInt(filterYear) !== invoiceYear) return;
+          if (filterYear && filterYear !== invoiceYear) return;
           if (searchQuery) {
             const matchesSearch =
               (invoice.invoiceNo || '').toLowerCase().includes(searchQuery) ||
@@ -445,16 +746,17 @@
           if (invoice.status === 'canceled') row.classList.add('canceled-row');
           const status = invoice.status === 'canceled' ? 'Canceled' : 'Active';
           row.innerHTML = `
-            <td>${invoice.invoiceNo}</td>
-            <td>${invoice.date}</td>
-            <td>${invoice.customerName}</td>
+            <td>${sanitizeHTML(invoice.invoiceNo)}</td>
+            <td>${sanitizeHTML(invoice.date)}</td>
+            <td>${sanitizeHTML(invoice.customerName)}</td>
             <td>Rs. ${invoice.total.toLocaleString('en-IN')}</td>
             <td>${status}</td>
             <td>
               <button class="action-btn view-btn" data-id="${invoice.id}">View</button>
-              <button class="action-btn print-btn" data-id="${invoice.id}">Print</button>
+              <button class="action-btn print-btn" data-id="${invoice.id}">View PDF</button>
               <button class="edit-btn" data-id="${invoice.id}">Edit</button>
               <button class="cancel-btn" data-id="${invoice.id}">${status === 'Canceled' ? 'Undo Cancel' : 'Cancel'}</button>
+              <button class="whatsapp-btn" data-id="${invoice.id}">WhatsApp</button>
             </td>
           `;
           invoiceListBody.appendChild(row);
@@ -481,6 +783,12 @@
           button.addEventListener('click', () => {
             const invoiceId = button.getAttribute('data-id');
             cancelInvoice(invoiceId);
+          });
+        });
+        document.querySelectorAll('.whatsapp-btn').forEach(button => {
+          button.addEventListener('click', () => {
+            const invoiceId = button.getAttribute('data-id');
+            sendInvoiceViaWhatsApp(invoiceId);
           });
         });
         document.getElementById('monthly-value').innerText = monthlyInvoices;
