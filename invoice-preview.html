@@ -5,8 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>Invoice Preview</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script type="module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"></script>
   <script type="module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js"></script>
   <style>
@@ -23,15 +21,19 @@
       display: flex;
       justify-content: center;
       margin: 20px 0;
+      gap: 10px;
     }
     .tab {
       padding: 10px 20px;
       cursor: pointer;
       background: #ddd;
-      margin: 0 5px;
       border-radius: 5px;
       text-decoration: none;
       color: black;
+      transition: background 0.3s;
+    }
+    .tab:hover {
+      background: #ccc;
     }
     .tab.active {
       background: #007bff;
@@ -52,39 +54,10 @@
       background: white;
       padding: 10mm;
       border: 1px solid #000;
-      box-sizing: border-box;
       page-break-after: always;
     }
     .invoice-page:last-child {
       page-break-after: auto;
-    }
-    @media print {
-      @page {
-        size: A4;
-        margin: 0;
-      }
-      body, body * {
-        visibility: hidden !important;
-      }
-      .invoice-preview, .invoice-page, .invoice-page * {
-        visibility: visible !important;
-      }
-      .invoice-page {
-        position: fixed !important;
-        top: 0 !important;
-        left: 0 !important;
-        width: 210mm !important;
-        min-height: 297mm !important;
-        margin: 0 !important;
-        padding: 5mm !important;
-        border: none !important;
-        box-sizing: border-box !important;
-        transform: scale(1) !important;
-        transform-origin: top left !important;
-      }
-      .download-btn, #save-btn, #manual-print-btn, .tabs {
-        display: none !important;
-      }
     }
     @media screen and (max-width: 768px) {
       .invoice-page {
@@ -105,6 +78,14 @@
       .bank-section, .terms, .signature, .right-info {
         font-size: 8px;
       }
+      .invoice-type-switch {
+        width: 100%;
+        max-width: 200px;
+      }
+      .download-btn {
+        font-size: 12px;
+        padding: 8px;
+      }
     }
     .header {
       display: flex;
@@ -112,9 +93,11 @@
       align-items: flex-start;
       flex-wrap: wrap;
       margin-bottom: 10px;
+      gap: 10px;
     }
     .logo {
       height: 40px;
+      object-fit: contain;
     }
     .title {
       font-size: 20px;
@@ -132,24 +115,28 @@
       width: 100%;
       border-collapse: collapse;
       font-size: 10px;
+      margin-bottom: 10px;
     }
     th, td {
       border: 1px solid #000;
       padding: 4px;
       text-align: left;
     }
+    th {
+      background: #f8f8f8;
+    }
     .bank-section {
-      width: 100%;
       display: flex;
       flex-direction: row;
       flex-wrap: wrap;
       font-size: 10px;
       margin-top: 15px;
+      gap: 0;
     }
     .terms, .signature {
       font-size: 10px;
     }
-    .download-btn, #save-btn, #manual-print-btn {
+    .download-btn {
       display: block;
       width: 90%;
       max-width: 300px;
@@ -161,6 +148,14 @@
       color: white;
       border: none;
       border-radius: 5px;
+      transition: background 0.3s;
+    }
+    .download-btn:hover {
+      background: #0056b3;
+    }
+    .download-btn:disabled {
+      background: #ccc;
+      cursor: not-allowed;
     }
     .right-info {
       font-size: 10px;
@@ -172,28 +167,43 @@
       font-size: 16px;
       color: #ff4d4d;
       margin: 20px 0;
+      font-weight: bold;
+    }
+    .invoice-type-switch {
+      display: block;
+      margin: 10px auto;
+      padding: 8px;
+      font-size: 14px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      background: #fff;
+      cursor: pointer;
     }
   </style>
 </head>
 <body>
-  <div class="tabs">
-    <a class="tab" href="index.html">Back to Dashboard</a>
-    <a class="tab" href="create-invoice.html">Create Invoice</a>
-    <a class="tab" href="invoice.html">Purchase Records</a>
-    <div class="tab active" data-tab="invoice-btn">Invoice Preview</div>
+  <div class="tabs" role="navigation">
+    <a class="tab" href="index.html" aria-label="Back to Dashboard">Back to Dashboard</a>
+    <a class="tab" href="create-invoice.html" aria-label="Create Invoice">Create Invoice</a>
+    <a class="tab" href="invoice.html" aria-label="Purchase Records">Purchase Records</a>
+    <div class="tab active" data-tab="invoice-btn" aria-current="page">Invoice Preview</div>
   </div>
 
   <div class="invoice-preview" id="invoice-btn">
-    <div id="invoice-pages"></div>
-    <button id="download-btn" class="download-btn">Download Invoice PDF</button>
-    <button id="save-btn" class="download-btn">Save Invoice</button>
-    <button id="manual-print-btn" class="download-btn" style="display: none;">Manual Print</button>
+    <select id="invoice-type-switch" class="invoice-type-switch" aria-label="Select Invoice Type">
+      <option value="tax">Tax Invoice</option>
+      <option value="regular">Regular Invoice</option>
+    </select>
+    <div id="invoice-pages" aria-live="polite"></div>
+    <button id="save-btn" class="download-btn" disabled>Save Invoice</button>
+    <button id="edit-btn" class="download-btn" disabled>Edit Invoice</button>
   </div>
 
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-    import { getFirestore, doc, getDoc, collection, addDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+    import { getFirestore, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
+    // Firebase configuration
     const firebaseConfig = {
       apiKey: "AIzaSyAT3oqplHoUuZrDNpnZbQ-hoUChLLEdmV4",
       authDomain: "saas-restaurant-vardhan.firebaseapp.com",
@@ -203,6 +213,7 @@
       appId: "1:1019077493371:web:2c92f2c902e34b05c358de"
     };
 
+    // Initialize Firebase
     let db;
     try {
       const app = initializeApp(firebaseConfig);
@@ -210,10 +221,19 @@
       console.log('Firebase initialized successfully');
     } catch (error) {
       console.error('Error initializing Firebase:', error);
-      alert('Failed to initialize Firebase. Please check your configuration.');
+      showError('Failed to initialize Firebase. Please check your configuration.');
     }
 
+    // Utility: Sanitize HTML to prevent XSS
+    function sanitizeHTML(str) {
+      const div = document.createElement('div');
+      div.textContent = str || '';
+      return div.innerHTML;
+    }
+
+    // Utility: Convert number to words (Indian Rupees)
     function numberToWords(num) {
+      if (!Number.isFinite(num) || num < 0) return 'Invalid Amount';
       if (num === 0) return 'Zero Rupees Only';
       const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
       const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
@@ -222,23 +242,18 @@
         if (n === 0) return '';
         if (n < 10) return ones[n];
         if (n < 20) return teens[n - 10];
-        if (n < 100) {
-          const ten = Math.floor(n / 10);
-          const unit = n % 10;
-          return tens[ten] + (unit ? ' ' + ones[unit] : '');
-        }
-        const hundred = Math.floor(n / 100);
-        const rest = n % 100;
-        return ones[hundred] + ' Hundred' + (rest ? ' and ' + convertLessThanThousand(rest) : '');
+        const ten = Math.floor(n / 10);
+        const unit = n % 10;
+        return tens[ten] + (unit ? ' ' + ones[unit] : '');
       }
       let words = '';
-      let crore = Math.floor(num / 10000000);
+      const crore = Math.floor(num / 10000000);
       num %= 10000000;
-      let lakh = Math.floor(num / 100000);
+      const lakh = Math.floor(num / 100000);
       num %= 100000;
-      let thousand = Math.floor(num / 1000);
+      const thousand = Math.floor(num / 1000);
       num %= 1000;
-      let hundreds = num;
+      const hundreds = Math.floor(num);
       if (crore) words += convertLessThanThousand(crore) + ' Crore ';
       if (lakh) words += convertLessThanThousand(lakh) + ' Lakh ';
       if (thousand) words += convertLessThanThousand(thousand) + ' Thousand ';
@@ -246,51 +261,63 @@
       return words.trim() + ' Rupees Only';
     }
 
+    // Utility: Show error message
+    function showError(message) {
+      const pagesContainer = document.getElementById('invoice-pages');
+      pagesContainer.innerHTML = `<div class="error-message">${sanitizeHTML(message)}</div>`;
+      document.getElementById('save-btn').disabled = true;
+      document.getElementById('edit-btn').disabled = true;
+    }
+
+    // Create invoice page content
     function createPageContent(pageNumber, invoiceData, items, startIndex, endIndex, totals) {
+      const isTaxInvoice = invoiceData.invoiceType === 'tax' || !invoiceData.invoiceType;
       const page = document.createElement('div');
       page.className = 'invoice-page';
       page.id = `invoice-page-${pageNumber}`;
       page.innerHTML = `
         <div class="header">
           <div>
-            <p class="title">TAX INVOICE</p>
+            <p class="title">${isTaxInvoice ? 'TAX INVOICE' : 'INVOICE'}</p>
             <div class="section">
-              <p><span class="bold">Invoice Date :</span> <span>${invoiceData.date || ''}</span></p>
-              <p><span class="bold">Invoice No :</span> <span>${invoiceData.invoiceNo || ''}</span></p>
-              <p><span class="bold">Place of Supply :</span> <span>${invoiceData.placeOfSupply || ''}</span></p>
+              <p><span class="bold">Invoice Date:</span> <span>${sanitizeHTML(invoiceData.date)}</span></p>
+              <p><span class="bold">Invoice No:</span> <span>${sanitizeHTML(invoiceData.invoiceNo)}</span></p>
+              <p><span class="bold">Place of Supply:</span> <span>${sanitizeHTML(invoiceData.placeOfSupply)}</span></p>
             </div>
             <div class="section">
-              <p><span class="bold">Name :</span> <span>${invoiceData.customerName || ''}</span></p>
-              <p><span class="bold">Address :</span> <span>${invoiceData.customerAddress || ''}</span></p>
-              <p><span class="bold">GSTIN :</span> <span>${invoiceData.customerGSTIN || ''}</span></p>
-              <p><span class="bold">STATE :</span> <span>${invoiceData.customerState || ''}</span></p>
+              <p><span class="bold">Name:</span> <span>${sanitizeHTML(invoiceData.customerName)}</span></p>
+              <p><span class="bold">Address:</span> <span>${sanitizeHTML(invoiceData.customerAddress)}</span></p>
+              <p><span class="bold">GSTIN:</span> <span>${sanitizeHTML(invoiceData.customerGSTIN)}</span></p>
+              <p><span class="bold">STATE:</span> <span>${sanitizeHTML(invoiceData.customerState)}</span></p>
             </div>
           </div>
           <div style="text-align: right;">
-            <img src="image.png" class="logo" alt="Tripzetta Logo">
+            <img src="image.png" class="logo" alt="Tripzetta Logo" onerror="this.src='fallback-logo.png'">
             <div class="right-info">
-              <p><strong>GSTIN :</strong> 07APDPA8620A1ZL</p>
-              <p><strong>PAN :</strong> APDPA8620A</p>
-              <p><strong>Regd. Address :</strong> 408 4th Floor Devika Tower Nehru Place New Delhi</p>
+              <p><strong>GSTIN:</strong> 07APDPA8620A1ZL</p>
+              <p><strong>PAN:</strong> APDPA8620A</p>
+              <p><strong>Regd. Address:</strong> 408 4th Floor Devika Tower Nehru Place New Delhi</p>
               <p><strong>Contact:</strong> +919650485130</p>
             </div>
           </div>
         </div>
-        <table id="invoice-table-${pageNumber}">
+        <table id="invoice-table-${pageNumber}" role="grid">
           <thead>
             <tr>
-              <th>#</th>
-              <th>Service Description</th>
-              <th>SAC Code</th>
-              <th>Tax Type</th>
-              <th>Taxable Value</th>
-              <th>SGST%</th>
-              <th>SGST Amount</th>
-              <th>CGST%</th>
-              <th>CGST Amount</th>
-              <th>IGST%</th>
-              <th>IGST Amount</th>
-              <th>Total (INR)</th>
+              <th scope="col">#</th>
+              <th scope="col">Service Description</th>
+              ${isTaxInvoice ? `
+                <th scope="col">SAC Code</th>
+                <th scope="col">Tax Type</th>
+              ` : ''}
+              <th scope="col">Taxable Value</th>
+              <th scope="col">SGST%</th>
+              <th scope="col">SGST Amount</th>
+              <th scope="col">CGST%</th>
+              <th scope="col">CGST Amount</th>
+              <th scope="col">IGST%</th>
+              <th scope="col">IGST Amount</th>
+              <th scope="col">Total (INR)</th>
             </tr>
           </thead>
           <tbody id="invoice-table-body-${pageNumber}"></tbody>
@@ -311,9 +338,11 @@
         const row = document.createElement('tr');
         row.innerHTML = `
           <td>${itemIndex + 1}</td>
-          <td>${(item.description || '').replace(/\n/g, '<br>')}</td>
-          <td>${item.sacCode || ''}</td>
-          <td>${item.taxType || ''}</td>
+          <td>${sanitizeHTML(item.description).replace(/\n/g, '<br>')}</td>
+          ${isTaxInvoice ? `
+            <td>${sanitizeHTML(item.sacCode)}</td>
+            <td>${sanitizeHTML(item.taxType)}</td>
+          ` : ''}
           <td>${taxableValue.toFixed(2)}</td>
           <td>${sgstRate.toFixed(2)}</td>
           <td>${sgstAmt.toFixed(2)}</td>
@@ -325,7 +354,7 @@
         `;
         tbody.appendChild(row);
         itemIndex++;
-        if (item.subItems && item.subItems.length > 0) {
+        if (item.subItems && Array.isArray(item.subItems)) {
           item.subItems.forEach(subItem => {
             const subTaxableValue = parseFloat(subItem.taxableValue) || 0;
             const subSgstAmt = subTaxableValue * sgstRate / 100 || 0;
@@ -335,16 +364,18 @@
             const subRow = document.createElement('tr');
             subRow.innerHTML = `
               <td></td>
-              <td>${(subItem.description || '').replace(/\n/g, '<br>')}</td>
-              <td></td>
-              <td></td>
+              <td>${sanitizeHTML(subItem.description).replace(/\n/g, '<br>')}</td>
+              ${isTaxInvoice ? `
+                <td></td>
+                <td></td>
+              ` : ''}
               <td>${subTaxableValue.toFixed(2)}</td>
               <td>${sgstRate.toFixed(2)}</td>
               <td>${subSgstAmt.toFixed(2)}</td>
               <td>${cgstRate.toFixed(2)}</td>
               <td>${subCgstAmt.toFixed(2)}</td>
               <td>${igstRate.toFixed(2)}</td>
-              <td>${igstAmt.toFixed(2)}</td>
+              <td>${subIgstAmt.toFixed(2)}</td>
               <td>${subTotal.toFixed(2)}</td>
             `;
             tbody.appendChild(subRow);
@@ -355,36 +386,36 @@
       if (endIndex >= items.length) {
         const totalRow = document.createElement('tr');
         totalRow.innerHTML = `
-          <td colspan="11" style="text-align:right;font-weight:bold;">Total Invoice Value</td>
+          <td colspan="${isTaxInvoice ? 11 : 9}" style="text-align:right;font-weight:bold;">Total Invoice Value</td>
           <td>${(totals.totalBeforeTax + totals.totalSGST + totals.totalCGST + totals.totalIGST).toFixed(2)}</td>
         `;
         tbody.appendChild(totalRow);
         page.innerHTML += `
           <div class="bank-section">
             <div style="width: 60%; border: 1px solid #000; padding: 5px; font-size: 10px;">
-              <p><strong>Bank Details :</strong></p>
-              <p>Beneficiary Name : TRIPZETTA</p>
-              <p>Bank Name : YES BANK</p>
-              <p>Branch : EAST OF KAILASH , New Delhi</p>
-              <p>IFSC CODE : YESB0000514</p>
-              <p>Current Account No : 051463700000043</p>
+              <p><strong>Bank Details:</strong></p>
+              <p>Beneficiary Name: TRIPZETTA</p>
+              <p>Bank Name: YES BANK</p>
+              <p>Branch: EAST OF KAILASH, New Delhi</p>
+              <p>IFSC CODE: YESB0000514</p>
+              <p>Current Account No: 051463700000043</p>
             </div>
             <div style="width: 40%; border: 1px solid #000; border-left: none; font-size: 10px;">
               <table style="width:100%; border-collapse: collapse;">
                 <tr><td style="border: 1px solid #000; padding: 4px;">Total Amount Before Tax</td><td style="border: 1px solid #000; padding: 4px;">${totals.totalBeforeTax.toFixed(2)}</td></tr>
-                <tr><td style="border: 1px solid #000; padding: 4px;">Add : SGST @ 9%</td><td style="border: 1px solid #000; padding: 4px;">${totals.totalSGST.toFixed(2)}</td></tr>
-                <tr><td style="border: 1px solid #000; padding: 4px;">Add : CGST @ 9%</td><td style="border: 1px solid #000; padding: 4px;">${totals.totalCGST.toFixed(2)}</td></tr>
-                <tr><td style="border: 1px solid #000; padding: 4px;">Add : IGST @ 18%</td><td style="border: 1px solid #000; padding: 4px;">${totals.totalIGST.toFixed(2)}</td></tr>
+                <tr><td style="border: 1px solid #000; padding: 4px;">Add: SGST @ 9%</td><td style="border: 1px solid #000; padding: 4px;">${totals.totalSGST.toFixed(2)}</td></tr>
+                <tr><td style="border: 1px solid #000; padding: 4px;">Add: CGST @ 9%</td><td style="border: 1px solid #000; padding: 4px;">${totals.totalCGST.toFixed(2)}</td></tr>
+                <tr><td style="border: 1px solid #000; padding: 4px;">Add: IGST @ 18%</td><td style="border: 1px solid #000; padding: 4px;">${totals.totalIGST.toFixed(2)}</td></tr>
                 <tr><td style="border: 1px solid #000; padding: 4px;">Rounding</td><td style="border: 1px solid #000; padding: 4px;">${totals.rounding.toFixed(2)}</td></tr>
                 <tr><td style="border: 1px solid #000; padding: 4px;"><strong>Total Invoice Value</strong></td><td style="border: 1px solid #000; padding: 4px;">${totals.roundedTotal.toFixed(2)}</td></tr>
               </table>
             </div>
           </div>
           <div style="width: 100%; border: 1px solid #000; border-top: none; font-size: 10px; padding: 4px;">
-            <strong>Total Invoice Value ( In Words ) :</strong> <span>${numberToWords(totals.roundedTotal)}</span>
+            <strong>Total Invoice Value (In Words):</strong> <span>${sanitizeHTML(numberToWords(totals.roundedTotal))}</span>
           </div>
           <div style="width: 100%; border: 1px solid #000; border-top: none; font-size: 10px; padding: 4px;">
-            <p><strong>Terms & Conditions :</strong></p>
+            <p><strong>Terms & Conditions:</strong></p>
             <ul style="margin: 4px 0 4px 15px; padding-left: 0;">
               <li>CHEQUE/NEFT/RTGS should be in favour of TRIPZETTA</li>
               <li>Any refunds or claims are subject to the cancellation policy of the booking as per rules.</li>
@@ -395,7 +426,7 @@
           <div style="width: 100%; border: 1px solid #000; border-top: none; display: flex; justify-content: flex-end; font-size: 10px; padding: 4px;">
             <div style="text-align: right;">
               <p>For TRIPZETTA</p>
-              <img src="sign.png" class="logo" alt="Tripzetta Signature">
+              <img src="sign.png" class="logo" alt="Tripzetta Signature" onerror="this.src='fallback-sign.png'">
               <p>Authorised Signatory</p>
             </div>
           </div>
@@ -404,280 +435,181 @@
       return page;
     }
 
+    // Save invoice to Firestore
     async function saveInvoice(invoiceId, invoiceData, totals) {
+      if (!invoiceId || !invoiceData.invoiceNo) {
+        showError('Invalid invoice data.');
+        return;
+      }
       try {
         const invoiceDoc = {
           ...invoiceData,
+          invoiceType: invoiceData.invoiceType || 'tax',
           total: totals.roundedTotal || 0,
           status: 'active',
           timestamp: new Date()
         };
-        await setDoc(doc(db, 'invoices', invoiceId), invoiceDoc);
+        await setDoc(doc(db, 'invoices', invoiceData.invoiceNo), invoiceDoc);
         const savedInvoice = {
-          invoiceId,
-          invoiceNo: invoiceData.invoiceNo || '',
+          invoiceId: invoiceData.invoiceNo,
+          invoiceNo: invoiceData.invoiceNo,
           date: invoiceData.date || '',
           customerName: invoiceData.customerName || '',
           totalAmount: totals.roundedTotal || 0,
+          invoiceType: invoiceData.invoiceType || 'tax',
           status: 'active',
           timestamp: new Date()
         };
-        await addDoc(collection(db, 'saved_invoices'), savedInvoice);
-        console.log('Invoice saved successfully');
+        await setDoc(doc(db, 'saved_invoices', invoiceData.invoiceNo), savedInvoice);
+        console.log('Invoice saved successfully with ID:', invoiceData.invoiceNo);
         alert('Invoice saved successfully.');
         window.location.href = 'index.html';
       } catch (error) {
         console.error('Error saving invoice:', error);
-        alert('Failed to save invoice.');
+        showError('Failed to save invoice. Please try again.');
       }
     }
 
+    // Render invoice pages
+    function renderInvoice(invoiceData, totals) {
+      const items = invoiceData.items || [];
+      const pagesContainer = document.getElementById('invoice-pages');
+      pagesContainer.innerHTML = '';
+      const maxContentHeight = 250; // mm
+      let currentPage = 1;
+      let currentItemIndex = 0;
+      const rowHeight = 5; // mm
+      const headerHeight = 25; // mm
+      const footerHeight = 25; // mm
+      while (currentItemIndex < items.length) {
+        let itemsInPage = [];
+        let currentHeight = headerHeight;
+        while (currentItemIndex < items.length && currentHeight + rowHeight <= maxContentHeight - footerHeight) {
+          itemsInPage.push(items[currentItemIndex]);
+          currentHeight += rowHeight;
+          if (items[currentItemIndex].subItems && Array.isArray(items[currentItemIndex].subItems)) {
+            currentHeight += items[currentItemIndex].subItems.length * rowHeight;
+          }
+          currentItemIndex++;
+        }
+        const pageContent = createPageContent(currentPage, invoiceData, items, currentItemIndex - itemsInPage.length, currentItemIndex, totals);
+        pagesContainer.appendChild(pageContent);
+        currentPage++;
+      }
+      console.log(`Rendered ${currentPage - 1} page(s)`);
+    }
+
+    // Load and process invoice
     async function loadInvoice(invoiceId) {
-      return new Promise((resolve, reject) => {
-        try {
-          console.log(`Fetching invoice ${invoiceId}`);
-          const docRef = doc(db, 'invoices', invoiceId);
-          getDoc(docRef).then(docSnap => {
-            if (!docSnap.exists()) {
-              console.error('Invoice not found');
-              alert('Invoice not found.');
-              reject(false);
-              return;
-            }
-            const invoiceData = docSnap.data();
-            console.log('Invoice data loaded:', invoiceData);
-            const items = invoiceData.items || [];
-            let totalBeforeTax = 0;
-            let totalSGST = 0;
-            let totalCGST = 0;
-            let totalIGST = 0;
-            items.forEach(item => {
-              const taxableValue = parseFloat(item.taxableValue) || 0;
-              const sgstRate = parseFloat(item.sgstRate) || 0;
-              const cgstRate = parseFloat(item.cgstRate) || 0;
-              const igstRate = parseFloat(item.igstRate) || 0;
-              let sgstAmt = taxableValue * sgstRate / 100 || 0;
-              let cgstAmt = taxableValue * cgstRate / 100 || 0;
-              let igstAmt = taxableValue * igstRate / 100 || 0;
-              totalBeforeTax += taxableValue;
-              totalSGST += sgstAmt;
-              totalCGST += cgstAmt;
-              totalIGST += igstAmt;
-              if (item.subItems && item.subItems.length > 0) {
-                item.subItems.forEach(subItem => {
-                  const subTaxableValue = parseFloat(subItem.taxableValue) || 0;
-                  sgstAmt = subTaxableValue * sgstRate / 100 || 0;
-                  cgstAmt = subTaxableValue * cgstRate / 100 || 0;
-                  igstAmt = subTaxableValue * igstRate / 100 || 0;
-                  totalBeforeTax += subTaxableValue;
-                  totalSGST += sgstAmt;
-                  totalCGST += cgstAmt;
-                  totalIGST += igstAmt;
-                });
-              }
+      if (!invoiceId) {
+        showError('No invoice ID provided. Redirecting to dashboard...');
+        setTimeout(() => window.location.href = 'index.html', 3000);
+        return null;
+      }
+      try {
+        console.log(`Fetching invoice ${invoiceId}`);
+        const docRef = doc(db, 'invoices', invoiceId);
+        const docSnap = await getDoc(docRef);
+        if (!docSnap.exists()) {
+          showError('Invoice not found.');
+          return null;
+        }
+        const invoiceData = docSnap.data();
+        console.log('Invoice data loaded:', invoiceData);
+        const items = Array.isArray(invoiceData.items) ? invoiceData.items : [];
+        let totalBeforeTax = 0;
+        let totalSGST = 0;
+        let totalCGST = 0;
+        let totalIGST = 0;
+        items.forEach(item => {
+          const taxableValue = parseFloat(item.taxableValue) || 0;
+          const sgstRate = parseFloat(item.sgstRate) || 0;
+          const cgstRate = parseFloat(item.cgstRate) || 0;
+          const igstRate = parseFloat(item.igstRate) || 0;
+          const sgstAmt = taxableValue * sgstRate / 100 || 0;
+          const cgstAmt = taxableValue * cgstRate / 100 || 0;
+          const igstAmt = taxableValue * igstRate / 100 || 0;
+          totalBeforeTax += taxableValue;
+          totalSGST += sgstAmt;
+          totalCGST += cgstAmt;
+          totalIGST += igstAmt;
+          if (item.subItems && Array.isArray(item.subItems)) {
+            item.subItems.forEach(subItem => {
+              const subTaxableValue = parseFloat(subItem.taxableValue) || 0;
+              const subSgstAmt = subTaxableValue * sgstRate / 100 || 0;
+              const subCgstAmt = subTaxableValue * cgstRate / 100 || 0;
+              const subIgstAmt = subTaxableValue * igstRate / 100 || 0;
+              totalBeforeTax += subTaxableValue;
+              totalSGST += subSgstAmt;
+              totalCGST += subCgstAmt;
+              totalIGST += subIgstAmt;
             });
-            const grossTotal = totalBeforeTax + totalSGST + totalCGST + totalIGST;
-            const roundedTotal = Math.round(grossTotal);
-            const rounding = roundedTotal - grossTotal;
-            const totals = {
-              totalBeforeTax,
-              totalSGST,
-              totalCGST,
-              totalIGST,
-              rounding,
-              roundedTotal
-            };
-            const pagesContainer = document.getElementById('invoice-pages');
-            pagesContainer.innerHTML = '';
-            const maxContentHeight = 250;
-            let currentPage = 1;
-            let currentItemIndex = 0;
-            let currentHeight = 0;
-            const rowHeight = 5;
-            const headerHeight = 25;
-            const footerHeight = 25;
-            while (currentItemIndex < items.length) {
-              let itemsInPage = [];
-              currentHeight = headerHeight;
-              while (currentItemIndex < items.length && currentHeight + rowHeight <= maxContentHeight - footerHeight) {
-                itemsInPage.push(items[currentItemIndex]);
-                currentHeight += rowHeight;
-                if (items[currentItemIndex].subItems && items[currentItemIndex].subItems.length) {
-                  currentHeight += items[currentItemIndex].subItems.length * rowHeight;
-                }
-                currentItemIndex++;
-              }
-              const pageContent = createPageContent(currentPage, invoiceData, items, currentItemIndex - itemsInPage.length, currentItemIndex, totals);
-              pagesContainer.appendChild(pageContent);
-              currentPage++;
-            }
-            console.log(`Rendered ${currentPage - 1} page(s)`);
-            document.getElementById('save-btn').dataset.invoiceId = invoiceId;
-            document.getElementById('save-btn').dataset.invoiceData = JSON.stringify(invoiceData);
-            document.getElementById('save-btn').dataset.totals = JSON.stringify(totals);
-            resolve(true);
-          }).catch(error => {
-            console.error('Error loading invoice:', error);
-            alert('Failed to load invoice data.');
-            reject(error);
-          });
-        } catch (error) {
-          console.error('Error in loadInvoice:', error);
-          reject(error);
-        }
-      });
-    }
-
-    function isMobileDevice() {
-      return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    }
-
-    function triggerPrint() {
-      console.log('Triggering print dialog');
-      try {
-        window.print();
-        return true;
-      } catch (error) {
-        console.error('Error triggering print:', error);
-        alert('Failed to open print dialog. Please use the manual print button.');
-        document.getElementById('manual-print-btn').style.display = 'block';
-        return false;
-      }
-    }
-
-    async function handleAutoPrint() {
-      console.log('Checking for auto-print');
-      const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.get('print') !== 'true') {
-        console.log('No print parameter, skipping auto-print');
-        return;
-      }
-      try {
-        const pagesContainer = document.getElementById('invoice-pages');
-        if (!pagesContainer.querySelector('.invoice-page')) {
-          console.error('No invoice pages rendered, showing manual print');
-          document.getElementById('manual-print-btn').style.display = 'block';
-          return;
-        }
-        const images = document.querySelectorAll('img');
-        const imagePromises = Array.from(images).map(img => {
-          return new Promise(resolve => {
-            if (img.complete) {
-              console.log(`Image ${img.src} already loaded`);
-              resolve();
-            } else {
-              img.addEventListener('load', () => {
-                console.log(`Image ${img.src} loaded`);
-                resolve();
-              }, { once: true });
-              img.addEventListener('error', () => {
-                console.log(`Error loading image ${img.src}`);
-                resolve();
-              }, { once: true });
-            }
-          });
+          }
         });
-        console.log(`Waiting for ${imagePromises.length} images to load`);
-        await Promise.all(imagePromises);
-        console.log('All images loaded, delaying print by 3 seconds');
-        setTimeout(() => {
-          const printSuccess = triggerPrint();
-          if (!printSuccess && isMobileDevice()) {
-            console.log('Mobile print failed, showing manual print button immediately');
-            document.getElementById('manual-print-btn').style.display = 'block';
-          }
-        }, 3000);
-        setTimeout(() => {
-          if (pagesContainer.children.length > 0 && document.getElementById('manual-print-btn').style.display === 'none') {
-            console.log('Print dialog not confirmed, showing manual print button');
-            document.getElementById('manual-print-btn').style.display = 'block';
-          }
-        }, 8000); // Adjusted for 3-second delay + 5 seconds
+        const grossTotal = totalBeforeTax + totalSGST + totalCGST + totalIGST;
+        const roundedTotal = Math.round(grossTotal);
+        const rounding = roundedTotal - grossTotal;
+        const totals = {
+          totalBeforeTax,
+          totalSGST,
+          totalCGST,
+          totalIGST,
+          rounding,
+          roundedTotal
+        };
+        // Set dropdown to current invoice type
+        document.getElementById('invoice-type-switch').value = invoiceData.invoiceType || 'tax';
+        // Enable buttons
+        const saveBtn = document.getElementById('save-btn');
+        const editBtn = document.getElementById('edit-btn');
+        saveBtn.disabled = false;
+        editBtn.disabled = false;
+        saveBtn.dataset.invoiceId = invoiceId;
+        saveBtn.dataset.invoiceData = JSON.stringify(invoiceData);
+        saveBtn.dataset.totals = JSON.stringify(totals);
+        editBtn.dataset.invoiceId = invoiceId;
+        return { invoiceData, totals };
       } catch (error) {
-        console.error('Error in handleAutoPrint:', error);
-        alert('Failed to prepare for printing. Please use the manual print button.');
-        document.getElementById('manual-print-btn').style.display = 'block';
+        console.error('Error loading invoice:', error);
+        showError('Failed to load invoice data.');
+        return null;
       }
     }
 
-    let printAttempted = false;
-    window.addEventListener('afterprint', () => {
-      if (printAttempted) {
-        console.log('Print dialog closed, redirecting to index.html');
-        window.location.href = 'index.html';
-      } else {
-        console.log('afterprint triggered without print attempt, ignoring');
-      }
-    });
-
-    document.getElementById('download-btn').addEventListener('click', async () => {
-      try {
-        console.log('Generating PDF');
-        const pages = document.getElementsByClassName('invoice-page');
-        const { jsPDF } = window.jspdf;
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = pdf.internal.pageSize.getHeight();
-        for (let i = 0; i < pages.length; i++) {
-          console.log(`Processing page ${i + 1}`);
-          const canvas = await html2canvas(pages[i], { scale: 2 });
-          const imgData = canvas.toDataURL('image/jpeg', 1.0);
-          if (i > 0) {
-            pdf.addPage();
-          }
-          pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
-        }
-        pdf.save('invoice.pdf');
-        console.log('PDF saved successfully');
-      } catch (error) {
-        console.error('Error generating PDF:', error);
-        alert('Failed to generate PDF.');
-      }
-    });
-
-    document.getElementById('save-btn').addEventListener('click', async () => {
-      const invoiceId = document.getElementById('save-btn').dataset.invoiceId;
-      const invoiceData = JSON.parse(document.getElementById('save-btn').dataset.invoiceData);
-      const totals = JSON.parse(document.getElementById('save-btn').dataset.totals);
-      await saveInvoice(invoiceId, invoiceData, totals);
-    });
-
-    document.getElementById('manual-print-btn').addEventListener('click', () => {
-      console.log('Manual print button clicked');
-      printAttempted = true;
-      triggerPrint();
-    });
-
+    // Initialize page
     (async () => {
       const urlParams = new URLSearchParams(window.location.search);
       const invoiceId = urlParams.get('invoiceId');
-      if (invoiceId) {
-        console.log('Starting invoice load for ID:', invoiceId);
-        try {
-          const loaded = await loadInvoice(invoiceId);
-          if (loaded) {
-            console.log('Invoice loaded, handling auto-print');
-            await handleAutoPrint();
-          } else {
-            console.log('Invoice load failed, showing manual print');
-            document.getElementById('manual-print-btn').style.display = 'block';
-          }
-        } catch (error) {
-          console.error('Failed to load invoice:', error);
-          document.getElementById('manual-print-btn').style.display = 'block';
-        }
-      } else {
-        console.log('No invoice ID provided, displaying message and redirecting');
-        const pagesContainer = document.getElementById('invoice-pages');
-        pagesContainer.innerHTML = '<div class="error-message">Please select an invoice from the dashboard. Redirecting in 3 seconds...</div>';
-        document.getElementById('download-btn').style.display = 'none';
-        document.getElementById('save-btn').style.display = 'none';
-        document.getElementById('manual-print-btn').style.display = 'none';
-        setTimeout(() => {
-          console.log('Redirecting to index.html due to missing invoiceId');
-          window.location.href = 'index.html';
-        }, 3000);
+      let invoiceData, totals;
+      const result = await loadInvoice(invoiceId);
+      if (result) {
+        ({ invoiceData, totals } = result);
+        renderInvoice(invoiceData, totals);
       }
+
+      // Handle invoice type switch
+      document.getElementById('invoice-type-switch').addEventListener('change', (e) => {
+        if (!invoiceData) return;
+        invoiceData.invoiceType = e.target.value;
+        document.getElementById('save-btn').dataset.invoiceData = JSON.stringify(invoiceData);
+        renderInvoice(invoiceData, totals);
+      });
+
+      // Save button
+      document.getElementById('save-btn').addEventListener('click', async () => {
+        const saveBtn = document.getElementById('save-btn');
+        const invoiceId = saveBtn.dataset.invoiceId;
+        const invoiceData = JSON.parse(saveBtn.dataset.invoiceData || '{}');
+        const totals = JSON.parse(saveBtn.dataset.totals || '{}');
+        await saveInvoice(invoiceId, invoiceData, totals);
+      });
+
+      // Edit button
+      document.getElementById('edit-btn').addEventListener('click', () => {
+        const invoiceId = document.getElementById('edit-btn').dataset.invoiceId;
+        console.log('Redirecting to edit invoice:', invoiceId);
+        window.location.href = `create-invoice.html?invoiceId=${invoiceId}`;
+      });
     })();
   </script>
 </body>

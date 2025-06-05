@@ -124,19 +124,19 @@
     <h2 id="form-title">Create Invoice</h2>
     <form id="invoice-form">
       <label for="invoice-date">Invoice Date:</label>
-      <input type="date" id="invoice-date" name="invoice-date">
+      <input type="date" id="invoice-date" name="invoice-date" required>
       <label for="invoice-no">Invoice No:</label>
-      <input type="text" id="invoice-no" name="invoice-no">
+      <input type="text" id="invoice-no" name="invoice-no" required>
       <label for="place-of-supply">Place of Supply:</label>
-      <input type="text" id="place-of-supply" name="place-of-supply">
+      <input type="text" id="place-of-supply" name="place-of-supply" required>
       <label for="customer-name">Customer's Name:</label>
-      <input type="text" id="customer-name" name="customer-name">
+      <input type="text" id="customer-name" name="customer-name" required>
       <label for="customer-address">Customer's Address:</label>
-      <textarea id="customer-address" name="customer-address"></textarea>
+      <textarea id="customer-address" name="customer-address" required></textarea>
       <label for="customer-gstin">Customer's GSTIN:</label>
-      <input type="text" id="customer-gstin" name="customer-gstin">
+      <input type="text" id="customer-gstin" name="customer-gstin" required>
       <label for="customer-state">Customer's STATE:</label>
-      <input type="text" id="customer-state" name="customer-state">
+      <input type="text" id="customer-state" name="customer-state" required>
       <h3>Items</h3>
       <div id="items-container">
         <div class="item">
@@ -166,10 +166,10 @@
 
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-    import { getFirestore, collection, addDoc, getDocs, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+    import { getFirestore, collection, getDocs, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
     const firebaseConfig = {
-      apiKey: "AIzaSyAT3oqplHoUuZrDNrnZbQ-hoUChLLEdmV4",
+      apiKey: "AIzaSyAT3oqplHoUuZrDNpnZbQ-hoUChLLEdmV4",
       authDomain: "saas-restaurant-vardhan.firebaseapp.com",
       projectId: "saas-restaurant-vardhan",
       storageBucket: "saas-restaurant-vardhan.appspot.com",
@@ -187,6 +187,7 @@
     }
 
     let editingInvoiceId = null;
+    let lastInvoiceNo = null;
 
     async function generateInvoiceNumber() {
       try {
@@ -251,8 +252,8 @@
           <button type="button" class="remove-item">Remove Service</button>
         </div>
       `;
-      const invoiceNo = await generateInvoiceNumber();
-      document.getElementById('invoice-no').value = invoiceNo;
+      // Do not set invoiceNo here; keep it empty or use lastInvoiceNo if available
+      document.getElementById('invoice-no').value = lastInvoiceNo || '';
     }
 
     async function editInvoice(invoiceId) {
@@ -333,8 +334,10 @@
           editingInvoiceId = null;
           document.getElementById('form-title').innerText = 'Create Invoice';
         } else {
-          const docRef = await addDoc(collection(db, 'invoices'), invoiceData);
-          invoiceId = docRef.id;
+          await setDoc(doc(db, 'invoices', invoiceData.invoiceNo), invoiceData);
+          invoiceId = invoiceData.invoiceNo;
+          // Generate next invoice number after successful save
+          lastInvoiceNo = await generateInvoiceNumber();
         }
         return invoiceId;
       } catch (error) {
@@ -386,6 +389,22 @@
 
     document.getElementById('preview-btn').addEventListener('click', async function () {
       const form = document.getElementById('invoice-form');
+      const mandatoryFields = [
+        { id: 'invoice-date', label: 'Invoice Date' },
+        { id: 'invoice-no', label: 'Invoice No' },
+        { id: 'place-of-supply', label: 'Place of Supply' },
+        { id: 'customer-name', label: "Customer's Name" },
+        { id: 'customer-address', label: "Customer's Address" },
+        { id: 'customer-gstin', label: "Customer's GSTIN" },
+        { id: 'customer-state', label: "Customer's STATE" }
+      ];
+      const missingFields = mandatoryFields
+        .filter(field => !form[field.id].value.trim())
+        .map(field => field.label);
+      if (missingFields.length > 0) {
+        alert(`Please fill in the following mandatory fields:\n- ${missingFields.join('\n- ')}`);
+        return;
+      }
       const items = document.querySelectorAll('#items-container .item');
       const invoiceItems = [];
       let totalBeforeTax = 0;
