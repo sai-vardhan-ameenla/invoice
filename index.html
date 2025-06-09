@@ -125,7 +125,7 @@
     .invoice-list th {
       background-color: #f2f2f2;
     }
-    .action-btn, .cancel-btn, .edit-btn, .whatsapp-btn {
+    .action-btn, .cancel-btn, .edit-btn, .gmail-btn {
       padding: 5px 10px;
       color: white;
       border: none;
@@ -136,7 +136,7 @@
     .action-btn { background: #007bff; }
     .cancel-btn { background: #ff8c00; }
     .edit-btn { background: #4CAF50; }
-    .whatsapp-btn { background: #25D366; }
+    .gmail-btn { background: #D44638; }
     .canceled-row { color: #888; }
     #pdf-container {
       display: none;
@@ -168,8 +168,8 @@
           <option value="2">February</option>
           <option value="3">March</option>
           <option value="4">April</option>
-          <option value="5" selected>May</option>
-          <option value="6">June</option>
+          <option value="5">May</option>
+          <option value="6" selected>June</option>
           <option value="7">July</option>
           <option value="8">August</option>
           <option value="9">September</option>
@@ -192,19 +192,19 @@
     <h3>Month-wise:</h3>
     <div class="stats">
       <div class="stat-box monthly">
-        <h3>Invoices (May-2025)</h3>
+        <h3>Invoices (June-2025)</h3>
         <p id="monthly-value">0</p>
       </div>
       <div class="stat-box monthly">
-        <h3>Subtotal (May-2025)</h3>
+        <h3>Subtotal (June-2025)</h3>
         <p id="subtotal-monthly">Rs. 0</p>
       </div>
       <div class="stat-box monthly">
-        <h3>GST Total (May-2025)</h3>
+        <h3>GST Total (June-2025)</h3>
         <p id="gst-monthly">Rs. 0</p>
       </div>
       <div class="stat-box monthly">
-        <h3>Earnings (May-2025)</h3>
+        <h3>Earnings (June-2025)</h3>
         <p id="earnings-monthly">Rs. 0</p>
       </div>
       <div class="stat-box monthly">
@@ -311,16 +311,6 @@
       return div.innerHTML;
     }
 
-    // Utility: Normalize phone number to E.164 format
-    function normalizePhoneNumber(phone) {
-      if (!phone) return '';
-      let cleaned = phone.replace(/\D/g, '');
-      if (cleaned.length === 10 && !cleaned.startsWith('+91')) {
-        cleaned = `+91${cleaned}`;
-      }
-      return cleaned.startsWith('+') ? cleaned : '';
-    }
-
     // Utility: Generate invoice HTML for PDF
     function generateInvoiceHTML(invoiceData, totals) {
       const isTaxInvoice = invoiceData.invoiceType === 'tax' || !invoiceData.invoiceType;
@@ -344,19 +334,19 @@
             <div>
               <p class="title">${isTaxInvoice ? 'TAX INVOICE' : 'INVOICE'}</p>
               <div class="section">
-                <p><span class="bold">Invoice Date:</span> ${sanitizeHTML(invoiceData.date)}</p>
-                <p><span class="bold">Invoice No:</span> ${sanitizeHTML(invoiceData.invoiceNo)}</p>
-                <p><span class="bold">Place of Supply:</span> ${sanitizeHTML(invoiceData.placeOfSupply)}</p>
+                <p><span class="bold">Invoice Date:</span> ${sanitizeHTML(invoiceData.date || 'N/A')}</p>
+                <p><span class="bold">Invoice No:</span> ${sanitizeHTML(invoiceData.invoiceNo || 'N/A')}</p>
+                <p><span class="bold">Place of Supply:</span> ${sanitizeHTML(invoiceData.placeOfSupply || 'N/A')}</p>
               </div>
               <div class="section">
-                <p><span class="bold">Name:</span> ${sanitizeHTML(invoiceData.customerName)}</p>
-                <p><span class="bold">Address:</span> ${sanitizeHTML(invoiceData.customerAddress)}</p>
-                <p><span class="bold">GSTIN:</span> ${sanitizeHTML(invoiceData.customerGSTIN)}</p>
-                <p><span class="bold">STATE:</span> ${sanitizeHTML(invoiceData.customerState)}</p>
+                <p><span class="bold">Name:</span> ${sanitizeHTML(invoiceData.customerName || 'N/A')}</p>
+                <p><span class="bold">Address:</span> ${sanitizeHTML(invoiceData.customerAddress || 'N/A')}</p>
+                <p><span class="bold">GSTIN:</span> ${sanitizeHTML(invoiceData.customerGSTIN || 'N/A')}</p>
+                <p><span class="bold">STATE:</span> ${sanitizeHTML(invoiceData.customerState || 'N/A')}</p>
               </div>
             </div>
             <div style="text-align: right;">
-              <img src="image.png" class="logo" alt="Tripzetta Logo">
+              <img src="image.png" class="logo" alt="Tripzetta Logo" onerror="this.style.display='none'">
               <div>
                 <p><strong>GSTIN:</strong> 07APDPA8620A1ZL</p>
                 <p><strong>PAN:</strong> APDPA8620A</p>
@@ -399,10 +389,10 @@
         html += `
           <tr>
             <td>${itemIndex + 1}</td>
-            <td>${sanitizeHTML(item.description).replace(/\n/g, '<br>')}</td>
+            <td>${sanitizeHTML(item.description || 'N/A').replace(/\n/g, '<br>')}</td>
             ${isTaxInvoice ? `
-              <td>${sanitizeHTML(item.sacCode)}</td>
-              <td>${sanitizeHTML(item.taxType)}</td>
+              <td>${sanitizeHTML(item.sacCode || 'N/A')}</td>
+              <td>${sanitizeHTML(item.taxType || 'N/A')}</td>
             ` : ''}
             <td>${taxableValue.toFixed(2)}</td>
             <td>${sgstRate.toFixed(2)}</td>
@@ -425,7 +415,7 @@
             html += `
               <tr>
                 <td></td>
-                <td>${sanitizeHTML(subItem.description).replace(/\n/g, '<br>')}</td>
+                <td>${sanitizeHTML(subItem.description || 'N/A').replace(/\n/g, '<br>')}</td>
                 ${isTaxInvoice ? `
                   <td></td>
                   <td></td>
@@ -486,7 +476,7 @@
           <div style="width: 100%; border: 1px solid #000; border-top: none; display: flex; justify-content: flex-end; padding: 4px;">
             <div style="text-align: right;">
               <p>For TRIPZETTA</p>
-              <img src="sign.png" class="logo" alt="Tripzetta Signature">
+              <img src="sign.png" class="logo" alt="Tripzetta Signature" onerror="this.style.display='none'">
               <p>Authorised Signatory</p>
             </div>
           </div>
@@ -525,21 +515,37 @@
       return words.trim() + ' Rupees Only';
     }
 
-    // Generate and send PDF via WhatsApp
-    async function sendInvoiceViaWhatsApp(invoiceId) {
+    // Utility: Detect if on mobile device
+    function isMobileDevice() {
+      return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    }
+
+    // Generate and send PDF via Gmail
+    async function sendInvoiceViaGmail(invoiceId) {
       try {
+        if (!db) {
+          throw new Error('Firestore database is not initialized.');
+        }
+
+        // Fetch invoice data
         const docRef = doc(db, 'invoices', invoiceId);
         const docSnap = await getDoc(docRef);
         if (!docSnap.exists()) {
-          alert('Invoice not found.');
-          return;
+          throw new Error(`Invoice with ID ${invoiceId} not found.`);
         }
+
         const invoiceData = docSnap.data();
-        const items = Array.isArray(invoiceData.items) ? invoiceData.items : [];
+        if (!invoiceData || !invoiceData.invoiceNo || !Array.isArray(invoiceData.items)) {
+          throw new Error('Invalid or incomplete invoice data.');
+        }
+
+        // Calculate totals
+        const items = invoiceData.items;
         let totalBeforeTax = 0;
         let totalSGST = 0;
         let totalCGST = 0;
         let totalIGST = 0;
+
         items.forEach(item => {
           const taxableValue = parseFloat(item.taxableValue) || 0;
           const sgstRate = parseFloat(item.sgstRate) || 0;
@@ -552,6 +558,7 @@
           totalSGST += sgstAmt;
           totalCGST += cgstAmt;
           totalIGST += igstAmt;
+
           if (item.subItems && Array.isArray(item.subItems)) {
             item.subItems.forEach(subItem => {
               const subTaxableValue = parseFloat(subItem.taxableValue) || 0;
@@ -565,6 +572,7 @@
             });
           }
         });
+
         const grossTotal = totalBeforeTax + totalSGST + totalCGST + totalIGST;
         const roundedTotal = Math.round(grossTotal);
         const rounding = roundedTotal - grossTotal;
@@ -576,26 +584,65 @@
           rounding,
           roundedTotal
         };
+
+        // Generate PDF
         const pdfContainer = document.getElementById('pdf-container');
+        if (!pdfContainer) {
+          throw new Error('PDF container element not found in DOM.');
+        }
+
         pdfContainer.innerHTML = generateInvoiceHTML(invoiceData, totals);
-        const pdfElement = pdfContainer.firstChild;
+        const pdfElement = pdfContainer.firstElementChild;
+        if (!pdfElement) {
+          throw new Error('Failed to generate invoice HTML content.');
+        }
+
         const opt = {
-          margin: 10,
+          margin: 5,
           filename: `Invoice_${invoiceData.invoiceNo}.pdf`,
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2 },
+          image: { type: 'jpeg', quality: 0.8 },
+          html2canvas: { scale: isMobileDevice() ? 1 : 2, logging: false },
           jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
-        await html2pdf().set(opt).from(pdfElement).save();
-        const phone = normalizePhoneNumber(invoiceData.customerPhone);
-        const message = encodeURIComponent(`Dear ${invoiceData.customerName},\nPlease find attached the invoice ${invoiceData.invoiceNo} for Rs. ${totals.roundedTotal.toFixed(2)}.\nThank you for your business!\nTRIPZETTA`);
-        const whatsappUrl = phone ? `https://wa.me/${phone}?text=${message}` : `https://wa.me/?text=${message}`;
-        window.open(whatsappUrl, '_blank');
-        alert('PDF has been downloaded. Please attach it in the opened WhatsApp chat.');
+
+        let pdf;
+        try {
+          pdf = await html2pdf().set(opt).from(pdfElement).output('blob');
+        } catch (pdfError) {
+          throw new Error(`PDF generation failed: ${pdfError.message}`);
+        }
+
+        if (!pdf) {
+          throw new Error('PDF generation returned no data.');
+        }
+
+        // Download PDF
+        const blobUrl = URL.createObjectURL(pdf);
+        const downloadLink = document.createElement('a');
+        downloadLink.href = blobUrl;
+        downloadLink.download = opt.filename;
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+        URL.revokeObjectURL(blobUrl);
+
+        // Open Gmail compose window
+        const recipient = encodeURIComponent('saivardhan294@gmail.com');
+        const sender = encodeURIComponent('saivardhanbusiness@gmail.com');
+        const subject = encodeURIComponent(`Invoice ${invoiceData.invoiceNo} from TRIPZETTA`);
+        const body = encodeURIComponent(
+          `Dear Sir/Madam,\n\nPlease find attached the invoice ${invoiceData.invoiceNo} for Rs. ${totals.roundedTotal.toFixed(2)}.\n\nThank you for your business!\nTRIPZETTA`
+        );
+        const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${recipient}&from=${sender}&su=${subject}&body=${body}`;
+
+        window.open(gmailUrl, '_blank');
+        alert('PDF has been downloaded. Please attach the downloaded PDF in the Gmail compose window and click "Send".');
+
+        // Clean up
         pdfContainer.innerHTML = '';
       } catch (error) {
-        console.error('Error generating PDF or opening WhatsApp:', error);
-        alert('Failed to generate PDF or open WhatsApp. Please try again.');
+        console.error('Error in sendInvoiceViaGmail:', error);
+        alert(`Failed to generate PDF or open Gmail: ${error.message}. Please try again or manually send the downloaded PDF.`);
       }
     }
 
@@ -756,7 +803,7 @@
               <button class="action-btn print-btn" data-id="${invoice.id}">View PDF</button>
               <button class="edit-btn" data-id="${invoice.id}">Edit</button>
               <button class="cancel-btn" data-id="${invoice.id}">${status === 'Canceled' ? 'Undo Cancel' : 'Cancel'}</button>
-              <button class="whatsapp-btn" data-id="${invoice.id}">WhatsApp</button>
+              <button class="gmail-btn" data-id="${invoice.id}">Gmail</button>
             </td>
           `;
           invoiceListBody.appendChild(row);
@@ -785,10 +832,10 @@
             cancelInvoice(invoiceId);
           });
         });
-        document.querySelectorAll('.whatsapp-btn').forEach(button => {
+        document.querySelectorAll('.gmail-btn').forEach(button => {
           button.addEventListener('click', () => {
             const invoiceId = button.getAttribute('data-id');
-            sendInvoiceViaWhatsApp(invoiceId);
+            sendInvoiceViaGmail(invoiceId);
           });
         });
         document.getElementById('monthly-value').innerText = monthlyInvoices;
@@ -837,6 +884,7 @@ Pending: ${document.getElementById('pending-yearly').textContent}
       link.href = URL.createObjectURL(blob);
       link.download = 'dashboard-report.txt';
       link.click();
+      URL.revokeObjectURL(link.href);
     }
 
     document.getElementById('filter-btn').addEventListener('click', updateDashboard);
