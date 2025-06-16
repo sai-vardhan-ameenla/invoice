@@ -246,6 +246,13 @@
         const unit = n % 10;
         return tens[ten] + (unit ? ' ' + ones[unit] : '');
       }
+      function convertLessThanHundred(n) {
+        if (n === 0) return '';
+        if (n < 100) return convertLessThanThousand(n);
+        const hundred = Math.floor(n / 100);
+        const remainder = n % 100;
+        return ones[hundred] + ' Hundred' + (remainder ? ' ' + convertLessThanThousand(remainder) : '');
+      }
       let words = '';
       const crore = Math.floor(num / 10000000);
       num %= 10000000;
@@ -257,7 +264,7 @@
       if (crore) words += convertLessThanThousand(crore) + ' Crore ';
       if (lakh) words += convertLessThanThousand(lakh) + ' Lakh ';
       if (thousand) words += convertLessThanThousand(thousand) + ' Thousand ';
-      if (hundreds) words += convertLessThanThousand(hundreds);
+      if (hundreds) words += convertLessThanHundred(hundreds);
       return words.trim() + ' Rupees Only';
     }
 
@@ -267,6 +274,13 @@
       pagesContainer.innerHTML = `<div class="error-message">${sanitizeHTML(message)}</div>`;
       document.getElementById('save-btn').disabled = true;
       document.getElementById('edit-btn').disabled = true;
+    }
+
+    // Generate a unique Firestore document ID
+    function generateDocId() {
+      const timestamp = Date.now();
+      const randomStr = Math.random().toString(36).substring(2, 10);
+      return `invoice_${timestamp}_${randomStr}`;
     }
 
     // Create invoice page content
@@ -449,9 +463,9 @@
           status: 'active',
           timestamp: new Date()
         };
-        await setDoc(doc(db, 'invoices', invoiceData.invoiceNo), invoiceDoc);
+        await setDoc(doc(db, 'invoices', invoiceId), invoiceDoc);
         const savedInvoice = {
-          invoiceId: invoiceData.invoiceNo,
+          invoiceId: invoiceId,
           invoiceNo: invoiceData.invoiceNo,
           date: invoiceData.date || '',
           customerName: invoiceData.customerName || '',
@@ -460,13 +474,13 @@
           status: 'active',
           timestamp: new Date()
         };
-        await setDoc(doc(db, 'saved_invoices', invoiceData.invoiceNo), savedInvoice);
-        console.log('Invoice saved successfully with ID:', invoiceData.invoiceNo);
+        await setDoc(doc(db, 'saved_invoices', invoiceId), savedInvoice);
+        console.log('Invoice saved successfully with ID:', invoiceId);
         alert('Invoice saved successfully.');
         window.location.href = 'index.html';
       } catch (error) {
         console.error('Error saving invoice:', error);
-        showError('Failed to save invoice. Please try again.');
+        showError(`Failed to save invoice: ${error.message}`);
       }
     }
 

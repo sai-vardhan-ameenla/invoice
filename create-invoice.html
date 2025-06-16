@@ -188,7 +188,13 @@
     }
 
     let editingInvoiceId = null;
-    let lastInvoiceNo = null;
+
+    // Generate a unique Firestore document ID
+    function generateDocId() {
+      const timestamp = Date.now();
+      const randomStr = Math.random().toString(36).substring(2, 10);
+      return `invoice_${timestamp}_${randomStr}`;
+    }
 
     async function generateInvoiceNumber() {
       try {
@@ -258,8 +264,7 @@
           <button type="button" class="remove-item">Remove Service</button>
         </div>
       `;
-      const invoiceNoInput = document.getElementById('invoice-no');
-      invoiceNoInput.value = lastInvoiceNo || (await generateInvoiceNumber());
+      document.getElementById('invoice-no').value = '';
     }
 
     async function editInvoice(invoiceId) {
@@ -334,27 +339,14 @@
           return null;
         }
         invoiceData.status = 'active';
-        let invoiceId;
-
-        // Validate invoiceNo to ensure it’s a valid Firestore ID
-        if (!invoiceData.invoiceNo || /[\[\]\/\.\*\s]/.test(invoiceData.invoiceNo)) {
-          alert('Invalid invoice number. Avoid using special characters like /, ., *, [], or spaces.');
-          return null;
-        }
-
+        let invoiceId = editingInvoiceId || generateDocId();
+        console.log('Using document ID:', invoiceId);
+        await setDoc(doc(db, 'invoices', invoiceId), invoiceData, { merge: true });
+        console.log('Invoice saved successfully with ID:', invoiceId);
         if (editingInvoiceId) {
-          console.log('Updating existing invoice with ID:', editingInvoiceId);
-          await setDoc(doc(db, 'invoices', editingInvoiceId), invoiceData, { merge: true });
-          invoiceId = editingInvoiceId;
           editingInvoiceId = null;
           document.getElementById('form-title').innerText = 'Create Invoice';
-        } else {
-          console.log('Creating new invoice with ID:', invoiceData.invoiceNo);
-          await setDoc(doc(db, 'invoices', invoiceData.invoiceNo), invoiceData);
-          invoiceId = invoiceData.invoiceNo;
-          lastInvoiceNo = await generateInvoiceNumber();
         }
-        console.log('Invoice saved successfully with ID:', invoiceId);
         return invoiceId;
       } catch (error) {
         console.error('Error saving invoice:', error);
