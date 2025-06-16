@@ -7,6 +7,8 @@
   <title>Invoice Preview</title>
   <script type="module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"></script>
   <script type="module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <style>
     * {
       box-sizing: border-box;
@@ -52,7 +54,7 @@
       min-height: 297mm;
       margin: 10px auto;
       background: white;
-      padding: 10mm;
+      padding: 15mm;
       border: 1px solid #000;
       page-break-after: always;
     }
@@ -86,14 +88,38 @@
         font-size: 12px;
         padding: 8px;
       }
+      .bank-section {
+        flex-direction: column;
+        gap: 5px;
+      }
+      .bank-section > div:first-child,
+      .bank-section > div:last-child {
+        width: 100% !important;
+        border-left: 1px solid #000;
+      }
+      .header-left {
+        max-width: 100%;
+      }
+      .right-info {
+        max-width: 100%;
+      }
     }
     .header {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      flex-wrap: wrap;
       margin-bottom: 10px;
       gap: 10px;
+    }
+    .header-left {
+      flex: 1;
+      max-width: 60%;
+      overflow-wrap: break-word;
+    }
+    .header-right {
+      flex-shrink: 0;
+      max-width: 35%;
+      text-align: right;
     }
     .logo {
       height: 40px;
@@ -128,10 +154,21 @@
     .bank-section {
       display: flex;
       flex-direction: row;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
+      justify-content: space-between;
       font-size: 10px;
       margin-top: 15px;
       gap: 0;
+    }
+    .bank-section > div:first-child {
+      width: 60%;
+      border: 1px solid #000;
+      padding: 5px;
+    }
+    .bank-section > div:last-child {
+      width: 39.5%;
+      border: 1px solid #000;
+      border-left: none;
     }
     .terms, .signature {
       font-size: 10px;
@@ -186,6 +223,7 @@
     <a class="tab" href="index.html" aria-label="Back to Dashboard">Back to Dashboard</a>
     <a class="tab" href="create-invoice.html" aria-label="Create Invoice">Create Invoice</a>
     <a class="tab" href="invoice.html" aria-label="Purchase Records">Purchase Records</a>
+    < Acquire a valid UUID for artifact_id
     <div class="tab active" data-tab="invoice-btn" aria-current="page">Invoice Preview</div>
   </div>
 
@@ -202,6 +240,7 @@
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
     import { getFirestore, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+    const { jsPDF } = window.jspdf;
 
     // Firebase configuration
     const firebaseConfig = {
@@ -276,6 +315,26 @@
       document.getElementById('edit-btn').disabled = true;
     }
 
+    // Utility: Format timestamp
+    function formatTimestamp(date) {
+      const options = {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: 'Asia/Kolkata',
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      };
+      return date.toLocaleString('en-IN', options) + ' IST';
+    }
+
+    // Utility: Detect if on mobile device
+    function isMobileDevice() {
+      return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    }
+
     // Generate a unique Firestore document ID
     function generateDocId() {
       const timestamp = Date.now();
@@ -283,7 +342,75 @@
       return `invoice_${timestamp}_${randomStr}`;
     }
 
-    // Create invoice page content
+    // Generate and download PDF using html2canvas and jsPDF
+    async function downloadInvoicePDF(invoiceData, totals) {
+      console.log('Starting PDF generation with html2canvas and jsPDF');
+      try {
+        if (!invoiceData || !invoiceData.invoiceNo || !Array.isArray(invoiceData.items)) {
+          throw new Error('Invalid or incomplete invoice data.');
+        }
+
+        // Initialize jsPDF
+        const doc = new jsPDF({
+          orientation: 'portrait',
+          unit: 'mm',
+      format: 'a4'
+        });
+
+        // Get all invoice pages
+        const pages = document.querySelectorAll('.invoice-page');
+        if (pages.length === 0) {
+          throw new Error('No invoice pages found to generate PDF.');
+        }
+
+        // A4 dimensions in mm
+        const pageWidth = 210;
+        const pageHeight = 297;
+
+        // Process each page
+        for (let i = 0; i < pages.length; i++) {
+          const page = pages[i];
+
+          // Capture the page as a canvas using html2canvas
+          const canvas = await html2canvas(page, {
+            scale: 2, // Increase resolution for better quality
+            useCORS: true, // Handle cross-origin images
+            windowWidth: page.scrollWidth,
+            windowHeight: page.scrollHeight
+          });
+
+          // Convert canvas to image
+          const imgData = canvas.toDataURL('image/png');
+
+          // Calculate dimensions to fit A4
+          const imgWidth = canvas.width;
+          const imgHeight = canvas.height;
+          const ratio = Math.min(pageWidth / imgWidth, pageHeight / imgHeight);
+          const scaledWidth = imgWidth * ratio;
+          const scaledHeight = imgHeight * ratio;
+
+          // Center the image on the page
+          const xOffset = (pageWidth - scaledWidth) / 2;
+          const yOffset = (pageHeight - scaledHeight) / 2;
+
+          // Add image to PDF
+          if (i > 0) doc.addPage();
+          doc.addImage(imgData, 'PNG', xOffset, yOffset, scaledWidth, scaledHeight);
+
+          console.log(`Processed page ${i + 1} of ${pages.length}`);
+        }
+
+        // Save the PDF
+        doc.save(`Invoice_${invoiceData.invoiceNo}.pdf`);
+        console.log('PDF generated and downloaded successfully');
+        alert('PDF has been downloaded successfully.');
+      } catch (error) {
+        console.error('Error in downloadInvoicePDF:', error.message);
+        alert(`Failed to download PDF: ${error.message}. Please check the console for details and try again.`);
+      }
+    }
+
+    // Create invoice page content for preview
     function createPageContent(pageNumber, invoiceData, items, startIndex, endIndex, totals) {
       const isTaxInvoice = invoiceData.invoiceType === 'tax' || !invoiceData.invoiceType;
       const page = document.createElement('div');
@@ -291,7 +418,7 @@
       page.id = `invoice-page-${pageNumber}`;
       page.innerHTML = `
         <div class="header">
-          <div>
+          <div class="header-left">
             <p class="title">${isTaxInvoice ? 'TAX INVOICE' : 'INVOICE'}</p>
             <div class="section">
               <p><span class="bold">Invoice Date:</span> <span>${sanitizeHTML(invoiceData.date)}</span></p>
@@ -305,7 +432,7 @@
               <p><span class="bold">STATE:</span> <span>${sanitizeHTML(invoiceData.customerState)}</span></p>
             </div>
           </div>
-          <div style="text-align: right;">
+          <div class="header-right">
             <img src="image.png" class="logo" alt="Tripzetta Logo" onerror="this.src='fallback-logo.png'">
             <div class="right-info">
               <p><strong>GSTIN:</strong> 07APDPA8620A1ZL</p>
@@ -414,7 +541,7 @@
               <p>IFSC CODE: YESB0000514</p>
               <p>Current Account No: 051463700000043</p>
             </div>
-            <div style="width: 40%; border: 1px solid #000; border-left: none; font-size: 10px;">
+            <div style="width: 39.5%; border: 1px solid #000; border-left: none; font-size: 10px;">
               <table style="width:100%; border-collapse: collapse;">
                 <tr><td style="border: 1px solid #000; padding: 4px;">Total Amount Before Tax</td><td style="border: 1px solid #000; padding: 4px;">${totals.totalBeforeTax.toFixed(2)}</td></tr>
                 <tr><td style="border: 1px solid #000; padding: 4px;">Add: SGST @ 9%</td><td style="border: 1px solid #000; padding: 4px;">${totals.totalSGST.toFixed(2)}</td></tr>
@@ -449,13 +576,14 @@
       return page;
     }
 
-    // Save invoice to Firestore
+    // Save invoice to Firestore and download PDF
     async function saveInvoice(invoiceId, invoiceData, totals) {
       if (!invoiceId || !invoiceData.invoiceNo) {
         showError('Invalid invoice data.');
         return;
       }
       try {
+        // Save to Firestore
         const invoiceDoc = {
           ...invoiceData,
           invoiceType: invoiceData.invoiceType || 'tax',
@@ -477,10 +605,15 @@
         await setDoc(doc(db, 'saved_invoices', invoiceId), savedInvoice);
         console.log('Invoice saved successfully with ID:', invoiceId);
         alert('Invoice saved successfully.');
+
+        // Generate and download PDF
+        await downloadInvoicePDF(invoiceData, totals);
+
+        // Redirect to dashboard
         window.location.href = 'index.html';
       } catch (error) {
-        console.error('Error saving invoice:', error);
-        showError(`Failed to save invoice: ${error.message}`);
+        console.error('Error saving invoice or generating PDF:', error);
+        showError(`Failed to save invoice or download PDF: ${error.message}`);
       }
     }
 
@@ -571,9 +704,7 @@
           rounding,
           roundedTotal
         };
-        // Set dropdown to current invoice type
         document.getElementById('invoice-type-switch').value = invoiceData.invoiceType || 'tax';
-        // Enable buttons
         const saveBtn = document.getElementById('save-btn');
         const editBtn = document.getElementById('edit-btn');
         saveBtn.disabled = false;
@@ -601,7 +732,6 @@
         renderInvoice(invoiceData, totals);
       }
 
-      // Handle invoice type switch
       document.getElementById('invoice-type-switch').addEventListener('change', (e) => {
         if (!invoiceData) return;
         invoiceData.invoiceType = e.target.value;
@@ -609,7 +739,6 @@
         renderInvoice(invoiceData, totals);
       });
 
-      // Save button
       document.getElementById('save-btn').addEventListener('click', async () => {
         const saveBtn = document.getElementById('save-btn');
         const invoiceId = saveBtn.dataset.invoiceId;
@@ -618,7 +747,6 @@
         await saveInvoice(invoiceId, invoiceData, totals);
       });
 
-      // Edit button
       document.getElementById('edit-btn').addEventListener('click', () => {
         const invoiceId = document.getElementById('edit-btn').dataset.invoiceId;
         console.log('Redirecting to edit invoice:', invoiceId);
