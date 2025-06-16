@@ -299,6 +299,7 @@
     try {
       const app = initializeApp(firebaseConfig);
       db = getFirestore(app);
+      console.log('Firebase initialized successfully');
     } catch (error) {
       console.error('Error initializing Firebase:', error);
       alert('Failed to initialize Firebase. Please check your configuration.');
@@ -328,8 +329,10 @@
           th { background: #f8f8f8; }
           .bank-section { display: flex; font-size: 10px; margin-top: 15px; }
           .logo { height: 40px; }
+          .timestamp { font-size: 10px; color: #555; text-align: right; margin-bottom: 10px; }
         </style>
         <div class="invoice-page">
+          <div class="timestamp">Generated on: ${formatTimestamp(new Date())}</div>
           <div class="header">
             <div>
               <p class="title">${isTaxInvoice ? 'TAX INVOICE' : 'INVOICE'}</p>
@@ -520,14 +523,29 @@
       return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     }
 
-    // Generate and send PDF via Gmail
-    async function sendInvoiceViaGmail(invoiceId) {
+    // Utility: Format timestamp
+    function formatTimestamp(date) {
+      const options = {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: 'Asia/Kolkata',
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      };
+      return date.toLocaleString('en-IN', options) + ' IST';
+    }
+
+    // Generate and download PDF
+    async function downloadInvoicePDF(invoiceId) {
       try {
         if (!db) {
           throw new Error('Firestore database is not initialized.');
         }
 
-        // Fetch invoice data
+        console.log(`Fetching invoice data for ID: ${invoiceId}`);
         const docRef = doc(db, 'invoices', invoiceId);
         const docSnap = await getDoc(docRef);
         if (!docSnap.exists()) {
@@ -535,6 +553,128 @@
         }
 
         const invoiceData = docSnap.data();
+        console.log('Invoice data fetched:', invoiceData);
+        if (!invoiceData || !invoiceData.invoiceNo || !Array.isArray(invoiceData.items)) {
+          throw new Error('Invalid or incomplete invoice data.');
+        }
+
+        // Calculate totals
+        const items = invoiceData.items;
+        let totalBeforeTax = 0;
+        let totalSGST = 0;
+        let totalCGST = 0;
+        let totalIGST = 0;
+
+        items.forEach(item => {
+          const taxableValue = parseFloat(item.taxableValue) || 0;
+          const sgstRate = parseFloat(item.sgstRate) || 0;
+          const cgstRate = parseFloat(item.cgstRate) || 0;
+          const igstRate = parseFloat(item.igstRate) || 0;
+          const sgstAmt = taxableValue * sgstRate / 100 || 0;
+          const cgstAmt = taxableValue * cgstRate / 100 || 0;
+          const igstAmt = taxableValue * igstRate / 100 || 0;
+          totalBeforeTax += taxableValue;
+          totalSGST += sgstAmt;
+          totalCGST += cgstAmt;
+          totalIGST += igstAmt;
+
+          if (item.subItems && Array.isArray(item.subItems)) {
+            item.subItems.forEach(subItem => {
+              const subTaxableValue = parseFloat(subItem.taxableValue) || 0;
+              const subSgstAmt = subTaxableValue * sgstRate / 100 || 0;
+              const subCgstAmt = subTaxableValue * cgstRate / 100 || 0;
+              const subIgstAmt = subTaxableValue * igstRate / 100 || 0;
+              totalBeforeTax += subTaxableValue;
+              totalSGST += subSgstAmt;
+              totalCGST += subCgstAmt;
+              totalIGST += subIgstAmt;
+            });
+          }
+        });
+
+        const grossTotal = totalBeforeTax + totalSGST + totalCGST + totalIGST;
+        const roundedTotal = Math.round(grossTotal);
+        const rounding = roundedTotal - grossTotal;
+        const totals = {
+          totalBeforeTax,
+          totalSGST,
+          totalCGST,
+          totalIGST,
+          rounding,
+          roundedTotal
+        };
+        console.log('Calculated totals:', totals);
+
+        // Generate PDF
+        const pdfContainer = document.getElementById('pdf-container');
+        if (!pdfContainer) {
+          throw new Error('PDF container element not found in DOM.');
+        }
+
+        console.log('Generating PDF HTML content');
+        pdfContainer.innerHTML = generateInvoiceHTML(invoiceData, totals);
+        const pdfElement = pdfContainer.firstElementChild;
+        if (!pdfElement) {
+          throw new Error('Failed to generate invoice HTML content.');
+        }
+
+        const opt = {
+          margin: 5,
+          filename: `Invoice_${invoiceData.invoiceNo}.pdf`,
+          image: { type: 'jpeg', quality: 0.8 },
+          html2canvas: { scale: isMobileDevice() ? 1 : 2, logging: false },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        console.log('Generating PDF with html2pdf.js');
+        let pdf;
+        try {
+          pdf = await html2pdf().set(opt).from(pdfElement).output('blob');
+        } catch (pdfError) {
+          throw new Error(`PDF generation failed: ${pdfError.message}`);
+        }
+
+        if (!pdf) {
+          throw new Error('PDF generation returned no data.');
+        }
+
+        // Download PDF
+        console.log('Initiating PDF download');
+        const blobUrl = URL.createObjectURL(pdf);
+        const downloadLink = document.createElement('a');
+        downloadLink.href = blobUrl;
+        downloadLink.download = opt.filename;
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+        URL.revokeObjectURL(blobUrl);
+
+        alert('PDF has been downloaded successfully.');
+
+        // Clean up
+        pdfContainer.innerHTML = '';
+      } catch (error) {
+        console.error('Error in downloadInvoicePDF:', error);
+        alert(`Failed to download PDF: ${error.message}. Please try again.`);
+      }
+    }
+
+    // Generate and send PDF via Gmail
+    async function sendInvoiceViaGmail(invoiceId) {
+      try {
+        if (!db) {
+          throw new Error('Firestore database is not initialized.');
+        }
+
+        console.log(`Fetching invoice data for Gmail send, ID: ${invoiceId}`);
+        const docRef = doc(db, 'invoices', invoiceId);
+        const docSnap = await getDoc(docRef);
+        if (!docSnap.exists()) {
+          throw new Error(`Invoice with ID ${invoiceId} not found.`);
+        }
+
+        const invoiceData = docSnap.data();
+        console.log('Invoice data for Gmail:', invoiceData);
         if (!invoiceData || !invoiceData.invoiceNo || !Array.isArray(invoiceData.items)) {
           throw new Error('Invalid or incomplete invoice data.');
         }
@@ -591,6 +731,7 @@
           throw new Error('PDF container element not found in DOM.');
         }
 
+        console.log('Generating PDF HTML for Gmail send');
         pdfContainer.innerHTML = generateInvoiceHTML(invoiceData, totals);
         const pdfElement = pdfContainer.firstElementChild;
         if (!pdfElement) {
@@ -605,6 +746,7 @@
           jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
 
+        console.log('Generating PDF for Gmail send');
         let pdf;
         try {
           pdf = await html2pdf().set(opt).from(pdfElement).output('blob');
@@ -617,6 +759,7 @@
         }
 
         // Download PDF
+        console.log('Initiating PDF download before Gmail send');
         const blobUrl = URL.createObjectURL(pdf);
         const downloadLink = document.createElement('a');
         downloadLink.href = blobUrl;
@@ -729,11 +872,13 @@
       const invoiceListBody = document.getElementById('invoice-list-body');
       invoiceListBody.innerHTML = '';
       try {
+        console.log('Fetching invoices from Firestore');
         const querySnapshot = await getDocs(collection(db, 'invoices'));
         const invoices = [];
         querySnapshot.forEach(doc => {
           invoices.push({ id: doc.id, ...doc.data() });
         });
+        console.log(`Fetched ${invoices.length} invoices`);
         invoices.forEach(invoice => {
           if (!invoice || !invoice.date || !Array.isArray(invoice.items)) return;
           const invoiceDate = new Date(invoice.date);
@@ -800,7 +945,7 @@
             <td>${status}</td>
             <td>
               <button class="action-btn view-btn" data-id="${invoice.id}">View</button>
-              <button class="action-btn print-btn" data-id="${invoice.id}">View PDF</button>
+              <button class="action-btn print-btn" data-id="${invoice.id}">Download PDF</button>
               <button class="edit-btn" data-id="${invoice.id}">Edit</button>
               <button class="cancel-btn" data-id="${invoice.id}">${status === 'Canceled' ? 'Undo Cancel' : 'Cancel'}</button>
               <button class="gmail-btn" data-id="${invoice.id}">Gmail</button>
@@ -817,7 +962,7 @@
         document.querySelectorAll('.print-btn').forEach(button => {
           button.addEventListener('click', () => {
             const invoiceId = button.getAttribute('data-id');
-            window.location.href = `invoice-preview.html?invoiceId=${invoiceId}&print=true`;
+            downloadInvoicePDF(invoiceId);
           });
         });
         document.querySelectorAll('.edit-btn').forEach(button => {
@@ -866,6 +1011,7 @@
       const selectedFY = document.getElementById('fy-select').value;
       const report = `
 Dashboard Report
+Generated on: ${formatTimestamp(new Date())}
 Month: ${selectedMonth}-${selectedYear}
 Invoices: ${document.getElementById('monthly-value').textContent}
 Subtotal: ${document.getElementById('subtotal-monthly').textContent}
