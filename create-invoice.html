@@ -181,6 +181,7 @@
     try {
       const app = initializeApp(firebaseConfig);
       db = getFirestore(app);
+      console.log('Firebase initialized successfully');
     } catch (error) {
       console.error('Error initializing Firebase:', error);
       alert('Failed to initialize Firebase. Please check your configuration.');
@@ -201,7 +202,9 @@
           }
         });
         const nextNumber = maxNumber + 1;
-        return `INV-${nextNumber.toString().padStart(4, '0')}`;
+        const newInvoiceNo = `INV-${nextNumber.toString().padStart(4, '0')}`;
+        console.log('Generated invoice number:', newInvoiceNo);
+        return newInvoiceNo;
       } catch (error) {
         console.error('Error generating invoice number:', error);
         alert('Error generating invoice number.');
@@ -211,12 +214,15 @@
 
     async function isInvoiceNumberUnique(invoiceNo, currentInvoiceId = null) {
       try {
+        console.log('Checking uniqueness for invoice number:', invoiceNo);
         const querySnapshot = await getDocs(collection(db, 'invoices'));
         for (const doc of querySnapshot.docs) {
           if (doc.data().invoiceNo === invoiceNo && doc.id !== currentInvoiceId) {
+            console.log('Invoice number already exists:', invoiceNo);
             return false;
           }
         }
+        console.log('Invoice number is unique:', invoiceNo);
         return true;
       } catch (error) {
         console.error('Error checking invoice number uniqueness:', error);
@@ -252,8 +258,8 @@
           <button type="button" class="remove-item">Remove Service</button>
         </div>
       `;
-      // Do not set invoiceNo here; keep it empty or use lastInvoiceNo if available
-      document.getElementById('invoice-no').value = lastInvoiceNo || '';
+      const invoiceNoInput = document.getElementById('invoice-no');
+      invoiceNoInput.value = lastInvoiceNo || (await generateInvoiceNumber());
     }
 
     async function editInvoice(invoiceId) {
@@ -321,6 +327,7 @@
 
     async function saveInvoice(invoiceData) {
       try {
+        console.log('Saving invoice with data:', invoiceData);
         const isUnique = await isInvoiceNumberUnique(invoiceData.invoiceNo, editingInvoiceId);
         if (!isUnique) {
           alert('Invoice number already exists. Please use a unique invoice number.');
@@ -328,21 +335,30 @@
         }
         invoiceData.status = 'active';
         let invoiceId;
+
+        // Validate invoiceNo to ensure it’s a valid Firestore ID
+        if (!invoiceData.invoiceNo || /[\[\]\/\.\*\s]/.test(invoiceData.invoiceNo)) {
+          alert('Invalid invoice number. Avoid using special characters like /, ., *, [], or spaces.');
+          return null;
+        }
+
         if (editingInvoiceId) {
+          console.log('Updating existing invoice with ID:', editingInvoiceId);
           await setDoc(doc(db, 'invoices', editingInvoiceId), invoiceData, { merge: true });
           invoiceId = editingInvoiceId;
           editingInvoiceId = null;
           document.getElementById('form-title').innerText = 'Create Invoice';
         } else {
+          console.log('Creating new invoice with ID:', invoiceData.invoiceNo);
           await setDoc(doc(db, 'invoices', invoiceData.invoiceNo), invoiceData);
           invoiceId = invoiceData.invoiceNo;
-          // Generate next invoice number after successful save
           lastInvoiceNo = await generateInvoiceNumber();
         }
+        console.log('Invoice saved successfully with ID:', invoiceId);
         return invoiceId;
       } catch (error) {
         console.error('Error saving invoice:', error);
-        alert('Failed to save invoice.');
+        alert(`Failed to save invoice: ${error.message}`);
         return null;
       }
     }
@@ -469,21 +485,27 @@
         items: invoiceItems,
         total: roundedTotal
       };
+      console.log('Invoice data to save:', invoiceData);
       const invoiceId = await saveInvoice(invoiceData);
       if (invoiceId) {
+        console.log('Redirecting to preview with invoiceId:', invoiceId);
         await resetInvoiceForm();
         window.location.href = `invoice-preview.html?invoiceId=${invoiceId}`;
+      } else {
+        console.log('Failed to get invoiceId, no redirect.');
       }
     });
 
-    // Check for invoiceId in URL for editing
-    const urlParams = new URLSearchParams(window.location.search);
-    const invoiceId = urlParams.get('invoiceId');
-    if (invoiceId) {
-      editInvoice(invoiceId);
-    } else {
-      resetInvoiceForm();
-    }
+    // Check for invoiceId in URL for editing or initialize form
+    (async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const invoiceId = urlParams.get('invoiceId');
+      if (invoiceId) {
+        await editInvoice(invoiceId);
+      } else {
+        await resetInvoiceForm();
+      }
+    })();
   </script>
 </body>
 </html>
