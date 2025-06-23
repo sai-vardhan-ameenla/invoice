@@ -362,11 +362,6 @@
       return words.trim() + ' Rupees Only';
     }
 
-    // Utility: Detect if on mobile device
-    function isMobileDevice() {
-      return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    }
-
     // Utility: Format timestamp
     function formatTimestamp(date) {
       const options = {
@@ -382,31 +377,27 @@
       return date.toLocaleString('en-IN', options) + ' IST';
     }
 
-    // Generate invoice HTML for PDF
-    function generateInvoiceHTML(invoiceData, totals) {
+    // Generate invoice page HTML for Gmail PDF
+    function generateInvoicePageHTML(invoiceData, items, totals) {
       const isTaxInvoice = invoiceData.invoiceType === 'tax' || !invoiceData.invoiceType;
-      const items = invoiceData.items || [];
       return `
-        <div class="invoice-page" style="width: 210mm; min-height: 297mm; padding: 15mm; border: 1px solid #000; background: #fff; font-family: Arial, sans-serif;">
-          <div style="font-size: 10px; color: #555; text-align: right; margin-bottom: 10px;">
-            Generated on: ${formatTimestamp(new Date())}
-          </div>
-          <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
-            <div>
+        <div class="invoice-page" style="width: 210mm; height: 297mm; padding: 15mm; border: 1px solid #000; background: #fff; font-family: Arial, sans-serif;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+            <div style="flex: 1; max-width: 60%;">
               <p style="font-size: 20px; font-weight: bold; margin: 0;">${isTaxInvoice ? 'TAX INVOICE' : 'INVOICE'}</p>
-              <div style="margin-bottom: 10px;">
-                <p style="margin: 2px 0;"><span style="font-weight: bold;">Invoice Date:</span> ${sanitizeHTML(invoiceData.date || 'N/A')}</p>
-                <p style="margin: 2px 0;"><span style="font-weight: bold;">Invoice No:</span> ${sanitizeHTML(invoiceData.invoiceNo || 'N/A')}</p>
-                <p style="margin: 2px 0;"><span style="font-weight: bold;">Place of Supply:</span> ${sanitizeHTML(invoiceData.placeOfSupply || 'N/A')}</p>
+              <div style="font-size: 12px; margin-bottom: 10px;">
+                <p style="margin: 2px 0;"><span style="font-weight: bold;">Invoice Date:</span> ${sanitizeHTML(invoiceData.date)}</p>
+                <p style="margin: 2px 0;"><span style="font-weight: bold;">Invoice No:</span> ${sanitizeHTML(invoiceData.invoiceNo)}</p>
+                <p style="margin: 2px 0;"><span style="font-weight: bold;">Place of Supply:</span> ${sanitizeHTML(invoiceData.placeOfSupply)}</p>
               </div>
-              <div style="margin-bottom: 10px;">
-                <p style="margin: 2px 0;"><span style="font-weight: bold;">Name:</span> ${sanitizeHTML(invoiceData.customerName || 'N/A')}</p>
-                <p style="margin: 2px 0;"><span style="font-weight: bold;">Address:</span> ${sanitizeHTML(invoiceData.customerAddress || 'N/A')}</p>
-                <p style="margin: 2px 0;"><span style="font-weight: bold;">GSTIN:</span> ${sanitizeHTML(invoiceData.customerGSTIN || 'N/A')}</p>
-                <p style="margin: 2px 0;"><span style="font-weight: bold;">STATE:</span> ${sanitizeHTML(invoiceData.customerState || 'N/A')}</p>
+              <div style="font-size: 12px;">
+                <p style="margin: 2px 0;"><span style="font-weight: bold;">Name:</span> ${sanitizeHTML(invoiceData.customerName)}</p>
+                <p style="margin: 2px 0;"><span style="font-weight: bold;">Address:</span> ${sanitizeHTML(invoiceData.customerAddress)}</p>
+                <p style="margin: 2px 0;"><span style="font-weight: bold;">GSTIN:</span> ${sanitizeHTML(invoiceData.customerGSTIN)}</p>
+                <p style="margin: 2px 0;"><span style="font-weight: bold;">STATE:</span> ${sanitizeHTML(invoiceData.customerState)}</p>
               </div>
             </div>
-            <div style="text-align: right;">
+            <div style="text-align: right; max-width: 35%;">
               <img src="image.png" style="height: 40px; object-fit: contain;" alt="Tripzetta Logo" onerror="this.src='fallback-logo.png'">
               <div style="font-size: 10px;">
                 <p><strong>GSTIN:</strong> 07APDPA8620A1ZL</p>
@@ -416,88 +407,86 @@
               </div>
             </div>
           </div>
-          <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 10px;">
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 10px;">
             <thead>
               <tr>
-                <th style="border: 1px solid #000; padding: 6px; text-align: center;">#</th>
-                <th style="border: 1px solid #000; padding: 6px;">Service Description</th>
+                <th style="border: 1px solid #000; padding: 4px; text-align: left;">#</th>
+                <th style="border: 1px solid #000; padding: 4px; text-align: left;">Service Description</th>
                 ${isTaxInvoice ? `
-                  <th style="border: 1px solid #000; padding: 6px; text-align: center;">SAC Code</th>
-                  <th style="border: 1px solid #000; padding: 6px; text-align: center;">Tax Type</th>
+                  <th style="border: 1px solid #000; padding: 4px; text-align: left;">SAC Code</th>
+                  <th style="border: 1px solid #000; padding: 4px; text-align: left;">Tax Type</th>
                 ` : ''}
-                <th style="border: 1px solid #000; padding: 6px; text-align: right;">Taxable Value</th>
-                <th style="border: 1px solid #000; padding: 6px; text-align: center;">SGST%</th>
-                <th style="border: 1px solid #000; padding: 6px; text-align: right;">SGST Amount</th>
-                <th style="border: 1px solid #000; padding: 6px; text-align: center;">CGST%</th>
-                <th style="border: 1px solid #000; padding: 6px; text-align: right;">CGST Amount</th>
-                <th style="border: 1px solid #000; padding: 6px; text-align: center;">IGST%</th>
-                <th style="border: 1px solid #000; padding: 6px; text-align: right;">IGST Amount</th>
-                <th style="border: 1px solid #000; padding: 6px; text-align: right;">Total (INR)</th>
+                <th style="border: 1px solid #000; padding: 4px; text-align: left;">Taxable Value</th>
+                <th style="border: 1px solid #000; padding: 4px; text-align: left;">SGST%</th>
+                <th style="border: 1px solid #000; padding: 4px; text-align: left;">SGST Amount</th>
+                <th style="border: 1px solid #000; padding: 4px; text-align: left;">CGST%</th>
+                <th style="border: 1px solid #000; padding: 4px; text-align: left;">CGST Amount</th>
+                <th style="border: 1px solid #000; padding: 4px; text-align: left;">IGST%</th>
+                <th style="border: 1px solid #000; padding: 4px; text-align: left;">IGST Amount</th>
+                <th style="border: 1px solid #000; padding: 4px; text-align: left;">Total (INR)</th>
               </tr>
             </thead>
             <tbody>
-              ${(() => {
-                let html = '';
-                let itemIndex = 0;
-                items.forEach(item => {
-                  const taxableValue = parseFloat(item.taxableValue) || 0;
-                  const sgstRate = parseFloat(item.sgstRate) || 0;
-                  const cgstRate = parseFloat(item.cgstRate) || 0;
-                  const igstRate = parseFloat(item.igstRate) || 0;
-                  const sgstAmt = taxableValue * sgstRate / 100 || 0;
-                  const cgstAmt = taxableValue * cgstRate / 100 || 0;
-                  const igstAmt = taxableValue * igstRate / 100 || 0;
-                  const total = taxableValue + sgstAmt + cgstAmt + igstAmt;
-                  html += `
-                    <tr>
-                      <td style="border: 1px solid #000; padding: 6px; text-align: center;">${itemIndex + 1}</td>
-                      <td style="border: 1px solid #000; padding: 6px;">${sanitizeHTML(item.description || 'N/A').replace(/\n/g, '<br>')}</td>
-                      ${isTaxInvoice ? `
-                        <td style="border: 1px solid #000; padding: 6px; text-align: center;">${sanitizeHTML(item.sacCode || 'N/A')}</td>
-                        <td style="border: 1px solid #000; padding: 6px; text-align: center;">${sanitizeHTML(item.taxType || 'N/A')}</td>
-                      ` : ''}
-                      <td style="border: 1px solid #000; padding: 6px; text-align: right;">${taxableValue.toFixed(2)}</td>
-                      <td style="border: 1px solid #000; padding: 6px; text-align: center;">${sgstRate.toFixed(2)}</td>
-                      <td style="border: 1px solid #000; padding: 6px; text-align: right;">${sgstAmt.toFixed(2)}</td>
-                      <td style="border: 1px solid #000; padding: 6px; text-align: center;">${cgstRate.toFixed(2)}</td>
-                      <td style="border: 1px solid #000; padding: 6px; text-align: right;">${cgstAmt.toFixed(2)}</td>
-                      <td style="border: 1px solid #000; padding: 6px; text-align: center;">${igstRate.toFixed(2)}</td>
-                      <td style="border: 1px solid #000; padding: 6px; text-align: right;">${igstAmt.toFixed(2)}</td>
-                      <td style="border: 1px solid #000; padding: 6px; text-align: right;">${total.toFixed(2)}</td>
-                    </tr>
-                  `;
-                  itemIndex++;
-                  if (item.subItems && Array.isArray(item.subItems)) {
-                    item.subItems.forEach(subItem => {
-                      const subTaxableValue = parseFloat(subItem.taxableValue) || 0;
-                      const subSgstAmt = subTaxableValue * sgstRate / 100 || 0;
-                      const subCgstAmt = subTaxableValue * cgstRate / 100 || 0;
-                      const subIgstAmt = subTaxableValue * igstRate / 100 || 0;
-                      const subTotal = subTaxableValue + subSgstAmt + subCgstAmt + subIgstAmt;
-                      html += `
-                        <tr>
-                          <td style="border: 1px solid #000; padding: 6px; text-align: center;"></td>
-                          <td style="border: 1px solid #000; padding: 6px;">${sanitizeHTML(subItem.description || 'N/A').replace(/\n/g, '<br>')}</td>
-                          ${isTaxInvoice ? `
-                            <td style="border: 1px solid #000; padding: 6px; text-align: center;"></td>
-                            <td style="border: 1px solid #000; padding: 6px; text-align: center;"></td>
-                          ` : ''}
-                          <td style="border: 1px solid #000; padding: 6px; text-align: right;">${subTaxableValue.toFixed(2)}</td>
-                          <td style="border: 1px solid #000; padding: 6px; text-align: center;">${sgstRate.toFixed(2)}</td>
-                          <td style="border: 1px solid #000; padding: 6px; text-align: right;">${subSgstAmt.toFixed(2)}</td>
-                          <td style="border: 1px solid #000; padding: 6px; text-align: center;">${cgstRate.toFixed(2)}</td>
-                          <td style="border: 1px solid #000; padding: 6px; text-align: right;">${subCgstAmt.toFixed(2)}</td>
-                          <td style="border: 1px solid #000; padding: 6px; text-align: center;">${igstRate.toFixed(2)}</td>
-                          <td style="border: 1px solid #000; padding: 6px; text-align: right;">${subIgstAmt.toFixed(2)}</td>
-                          <td style="border: 1px solid #000; padding: 6px; text-align: right;">${subTotal.toFixed(2)}</td>
-                        </tr>
-                      `;
-                      itemIndex++;
-                    });
-                  }
-                });
+              ${items.map((item, index) => {
+                const taxableValue = parseFloat(item.taxableValue) || 0;
+                const sgstRate = parseFloat(item.sgstRate) || 0;
+                const cgstRate = parseFloat(item.cgstRate) || 0;
+                const igstRate = parseFloat(item.igstRate) || 0;
+                const sgstAmt = taxableValue * sgstRate / 100 || 0;
+                const cgstAmt = taxableValue * cgstRate / 100 || 0;
+                const igstAmt = taxableValue * igstRate / 100 || 0;
+                const total = taxableValue + sgstAmt + cgstAmt + igstAmt;
+                let html = `
+                  <tr>
+                    <td style="border: 1px solid #000; padding: 4px;">${index + 1}</td>
+                    <td style="border: 1px solid #000; padding: 4px;">${sanitizeHTML(item.description).replace(/\n/g, '<br>')}</td>
+                    ${isTaxInvoice ? `
+                      <td style="border: 1px solid #000; padding: 4px;">${sanitizeHTML(item.sacCode)}</td>
+                      <td style="border: 1px solid #000; padding: 4px;">${sanitizeHTML(item.taxType)}</td>
+                    ` : ''}
+                    <td style="border: 1px solid #000; padding: 4px;">${taxableValue.toFixed(2)}</td>
+                    <td style="border: 1px solid #000; padding: 4px;">${sgstRate.toFixed(2)}</td>
+                    <td style="border: 1px solid #000; padding: 4px;">${sgstAmt.toFixed(2)}</td>
+                    <td style="border: 1px solid #000; padding: 4px;">${cgstRate.toFixed(2)}</td>
+                    <td style="border: 1px solid #000; padding: 4px;">${cgstAmt.toFixed(2)}</td>
+                    <td style="border: 1px solid #000; padding: 4px;">${igstRate.toFixed(2)}</td>
+                    <td style="border: 1px solid #000; padding: 4px;">${igstAmt.toFixed(2)}</td>
+                    <td style="border: 1px solid #000; padding: 4px;">${total.toFixed(2)}</td>
+                  </tr>
+                `;
+                if (item.subItems && Array.isArray(item.subItems)) {
+                  item.subItems.forEach(subItem => {
+                    const subTaxableValue = parseFloat(subItem.taxableValue) || 0;
+                    const subSgstAmt = subTaxableValue * sgstRate / 100 || 0;
+                    const subCgstAmt = subTaxableValue * cgstRate / 100 || 0;
+                    const subIgstAmt = subTaxableValue * igstRate / 100 || 0;
+                    const subTotal = subTaxableValue + subSgstAmt + subCgstAmt + subIgstAmt;
+                    html += `
+                      <tr>
+                        <td style="border: 1px solid #000; padding: 4px;"></td>
+                        <td style="border: 1px solid #000; padding: 4px;">${sanitizeHTML(subItem.description).replace(/\n/g, '<br>')}</td>
+                        ${isTaxInvoice ? `
+                          <td style="border: 1px solid #000; padding: 4px;"></td>
+                          <td style="border: 1px solid #000; padding: 4px;"></td>
+                        ` : ''}
+                        <td style="border: 1px solid #000; padding: 4px;">${subTaxableValue.toFixed(2)}</td>
+                        <td style="border: 1px solid #000; padding: 4px;">${sgstRate.toFixed(2)}</td>
+                        <td style="border: 1px solid #000; padding: 4px;">${subSgstAmt.toFixed(2)}</td>
+                        <td style="border: 1px solid #000; padding: 4px;">${cgstRate.toFixed(2)}</td>
+                        <td style="border: 1px solid #000; padding: 4px;">${subCgstAmt.toFixed(2)}</td>
+                        <td style="border: 1px solid #000; padding: 4px;">${igstRate.toFixed(2)}</td>
+                        <td style="border: 1px solid #000; padding: 4px;">${subIgstAmt.toFixed(2)}</td>
+                        <td style="border: 1px solid #000; padding: 4px;">${subTotal.toFixed(2)}</td>
+                      </tr>
+                    `;
+                  });
+                }
                 return html;
-              })()}
+              }).join('')}
+              <tr>
+                <td colspan="${isTaxInvoice ? 11 : 9}" style="border: 1px solid #000; padding: 4px; text-align: right; font-weight: bold;">Total Invoice Value</td>
+                <td style="border: 1px solid #000; padding: 4px;">${(totals.totalBeforeTax + totals.totalSGST + totals.totalCGST + totals.totalIGST).toFixed(2)}</td>
+              </tr>
             </tbody>
           </table>
           <div style="display: flex; font-size: 10px; margin-top: 15px;">
@@ -510,29 +499,29 @@
               <p>Current Account No: 051463700000043</p>
             </div>
             <div style="width: 40%; border: 1px solid #000; border-left: none;">
-              <table style="width:100%; border-collapse: collapse;">
-                <tr><td style="border: 1px solid #000; padding: 4px;">Total Amount Before Tax</td><td style="border: 1px solid #000; padding: 4px; text-align: right;">${totals.totalBeforeTax.toFixed(2)}</td></tr>
-                <tr><td style="border: 1px solid #000; padding: 4px;">Add: SGST @ 9%</td><td style="border: 1px solid #000; padding: 4px; text-align: right;">${totals.totalSGST.toFixed(2)}</td></tr>
-                <tr><td style="border: 1px solid #000; padding: 4px;">Add: CGST @ 9%</td><td style="border: 1px solid #000; padding: 4px; text-align: right;">${totals.totalCGST.toFixed(2)}</td></tr>
-                <tr><td style="border: 1px solid #000; padding: 4px;">Add: IGST @ 18%</td><td style="border: 1px solid #000; padding: 4px; text-align: right;">${totals.totalIGST.toFixed(2)}</td></tr>
-                <tr><td style="border: 1px solid #000; padding: 4px;">Rounding</td><td style="border: 1px solid #000; padding: 4px; text-align: right;">${totals.rounding.toFixed(2)}</td></tr>
-                <tr><td style="border: 1px solid #000; padding: 4px;"><strong>Total Invoice Value</strong></td><td style="border: 1px solid #000; padding: 4px; text-align: right;">${totals.roundedTotal.toFixed(2)}</td></tr>
+              <table style="width: 100%; border-collapse: collapse;">
+                <tr><td style="border: 1px solid #000; padding: 4px;">Total Amount Before Tax</td><td style="border: 1px solid #000; padding: 4px;">${totals.totalBeforeTax.toFixed(2)}</td></tr>
+                <tr><td style="border: 1px solid #000; padding: 4px;">Add: SGST @ 9%</td><td style="border: 1px solid #000; padding: 4px;">${totals.totalSGST.toFixed(2)}</td></tr>
+                <tr><td style="border: 1px solid #000; padding: 4px;">Add: CGST @ 9%</td><td style="border: 1px solid #000; padding: 4px;">${totals.totalCGST.toFixed(2)}</td></tr>
+                <tr><td style="border: 1px solid #000; padding: 4px;">Add: IGST @ 18%</td><td style="border: 1px solid #000; padding: 4px;">${totals.totalIGST.toFixed(2)}</td></tr>
+                <tr><td style="border: 1px solid #000; padding: 4px;">Rounding</td><td style="border: 1px solid #000; padding: 4px;">${totals.rounding.toFixed(2)}</td></tr>
+                <tr><td style="border: 1px solid #000; padding: 4px;"><strong>Total Invoice Value</strong></td><td style="border: 1px solid #000; padding: 4px;">${totals.roundedTotal.toFixed(2)}</td></tr>
               </table>
             </div>
           </div>
-          <div style="width: 100%; border: 1px solid #000; border-top: none; padding: 4px; font-size: 10px;">
+          <div style="width: 100%; border: 1px solid #000; border-top: none; font-size: 10px; padding: 4px;">
             <strong>Total Invoice Value (In Words):</strong> ${sanitizeHTML(numberToWords(totals.roundedTotal))}
           </div>
-          <div style="width: 100%; border: 1px solid #000; border-top: none; padding: 4px; font-size: 10px;">
+          <div style="width: 100%; border: 1px solid #000; border-top: none; font-size: 10px; padding: 4px;">
             <p><strong>Terms & Conditions:</strong></p>
-            <ul style="margin: 4px 0; padding-left: 15px;">
+            <ul style="margin: 4px 0 4px 15px; padding-left: 0;">
               <li>CHEQUE/NEFT/RTGS should be in favour of TRIPZETTA</li>
               <li>Any refunds or claims are subject to the cancellation policy of the booking as per rules.</li>
               <li>All disputes are subject to jurisdiction of Delhi courts.</li>
               <li>Interest @ 18% p.a. will be charged on overdue bills.</li>
             </ul>
           </div>
-          <div style="width: 100%; border: 1px solid #000; border-top: none; display: flex; justify-content: flex-end; padding: 4px; font-size: 10px;">
+          <div style="width: 100%; border: 1px solid #000; border-top: none; display: flex; justify-content: flex-end; font-size: 10px; padding: 4px;">
             <div style="text-align: right;">
               <p>For TRIPZETTA</p>
               <img src="sign.png" style="height: 40px;" alt="Tripzetta Signature" onerror="this.src='fallback-sign.png'">
@@ -543,140 +532,22 @@
       `;
     }
 
-    // Generate and download PDF
-    async function downloadInvoicePDF(invoiceId) {
-      console.log(`Starting PDF download for invoice ID: ${invoiceId}`);
-      try {
-        if (!db) throw new Error('Firestore database is not initialized.');
-
-        // Fetch invoice data
-        console.log('Fetching invoice data from Firestore');
-        const docRef = doc(db, 'invoices', invoiceId);
-        const docSnap = await getDoc(docRef);
-        if (!docSnap.exists()) throw new Error(`Invoice with ID ${invoiceId} not found.`);
-
-        const invoiceData = docSnap.data();
-        console.log('Invoice data fetched:', invoiceData);
-        if (!invoiceData || !invoiceData.invoiceNo || !Array.isArray(invoiceData.items)) {
-          throw new Error('Invalid or incomplete invoice data.');
-        }
-
-        // Calculate totals
-        const items = invoiceData.items;
-        let totalBeforeTax = 0;
-        let totalSGST = 0;
-        let totalCGST = 0;
-        let totalIGST = 0;
-
-        items.forEach(item => {
-          const taxableValue = parseFloat(item.taxableValue) || 0;
-          const sgstRate = parseFloat(item.sgstRate) || 0;
-          const cgstRate = parseFloat(item.cgstRate) || 0;
-          const igstRate = parseFloat(item.igstRate) || 0;
-          const sgstAmt = taxableValue * sgstRate / 100 || 0;
-          const cgstAmt = taxableValue * cgstRate / 100 || 0;
-          const igstAmt = taxableValue * igstRate / 100 || 0;
-          totalBeforeTax += taxableValue;
-          totalSGST += sgstAmt;
-          totalCGST += cgstAmt;
-          totalIGST += igstAmt;
-
-          if (item.subItems && Array.isArray(item.subItems)) {
-            item.subItems.forEach(subItem => {
-              const subTaxableValue = parseFloat(subItem.taxableValue) || 0;
-              const subSgstAmt = subTaxableValue * sgstRate / 100 || 0;
-              const subCgstAmt = subTaxableValue * cgstRate / 100 || 0;
-              const subIgstAmt = subTaxableValue * igstRate / 100 || 0;
-              totalBeforeTax += subTaxableValue;
-              totalSGST += subSgstAmt;
-              totalCGST += subCgstAmt;
-              totalIGST += subIgstAmt;
-            });
-          }
-        });
-
-        const grossTotal = totalBeforeTax + totalSGST + totalCGST + totalIGST;
-        const roundedTotal = Math.round(grossTotal);
-        const rounding = roundedTotal - grossTotal;
-        const totals = { totalBeforeTax, totalSGST, totalCGST, totalIGST, rounding, roundedTotal };
-        console.log('Calculated totals:', totals);
-
-        // Generate HTML content
-        const pdfContainer = document.getElementById('pdf-container');
-        if (!pdfContainer) throw new Error('PDF container element not found in DOM.');
-
-        console.log('Generating invoice HTML');
-        pdfContainer.innerHTML = generateInvoiceHTML(invoiceData, totals);
-        const pdfElement = pdfContainer.querySelector('.invoice-page');
-        if (!pdfElement) throw new Error('Failed to generate invoice HTML content.');
-
-        // Initialize jsPDF
-        const doc = new jsPDF({
-          orientation: 'portrait',
-          unit: 'mm',
-          format: 'a4'
-        });
-
-        // Capture the content as an image
-        const canvas = await html2canvas(pdfElement, {
-          scale: isMobileDevice() ? 2 : 3,
-          useCORS: true,
-          windowWidth: pdfElement.scrollWidth,
-          windowHeight: pdfElement.scrollHeight
-        });
-
-        const imgData = canvas.toDataURL('image/png');
-        const pageWidth = 210;
-        const pageHeight = 297;
-        const imgWidth = canvas.width;
-        const imgHeight = canvas.height;
-        const ratio = Math.min(pageWidth / imgWidth, pageHeight / imgHeight);
-        const scaledWidth = imgWidth * ratio;
-        const scaledHeight = imgHeight * ratio;
-        const xOffset = (pageWidth - scaledWidth) / 2;
-        const yOffset = (pageHeight - scaledHeight) / 2;
-
-        doc.addImage(imgData, 'PNG', xOffset, yOffset, scaledWidth, scaledHeight);
-        doc.save(`Invoice_${invoiceData.invoiceNo}.pdf`);
-
-        console.log('PDF downloaded successfully');
-        alert('PDF has been downloaded successfully.');
-
-        // Clean up
-        pdfContainer.innerHTML = '';
-      } catch (error) {
-        console.error('Error in downloadInvoicePDF:', error.message);
-        alert(`Failed to download PDF: ${error.message}. Please check the console for details and try again.`);
-        const pdfContainer = document.getElementById('pdf-container');
-        if (pdfContainer) pdfContainer.innerHTML = '';
-      }
-    }
-
     // Generate and send PDF via Gmail
     async function sendInvoiceViaGmail(invoiceId) {
       console.log(`Starting Gmail send process for invoice ID: ${invoiceId}`);
       try {
         if (!db) throw new Error('Firestore database is not initialized.');
-
-        // Fetch invoice data
-        console.log('Fetching invoice data for Gmail send');
         const docRef = doc(db, 'invoices', invoiceId);
         const docSnap = await getDoc(docRef);
         if (!docSnap.exists()) throw new Error(`Invoice with ID ${invoiceId} not found.`);
-
         const invoiceData = docSnap.data();
-        console.log('Invoice data for Gmail:', invoiceData);
         if (!invoiceData || !invoiceData.invoiceNo || !Array.isArray(invoiceData.items)) {
           throw new Error('Invalid or incomplete invoice data.');
         }
 
         // Calculate totals
         const items = invoiceData.items;
-        let totalBeforeTax = 0;
-        let totalSGST = 0;
-        let totalCGST = 0;
-        let totalIGST = 0;
-
+        let totalBeforeTax = 0, totalSGST = 0, totalCGST = 0, totalIGST = 0;
         items.forEach(item => {
           const taxableValue = parseFloat(item.taxableValue) || 0;
           const sgstRate = parseFloat(item.sgstRate) || 0;
@@ -689,50 +560,35 @@
           totalSGST += sgstAmt;
           totalCGST += cgstAmt;
           totalIGST += igstAmt;
-
           if (item.subItems && Array.isArray(item.subItems)) {
             item.subItems.forEach(subItem => {
               const subTaxableValue = parseFloat(subItem.taxableValue) || 0;
-              const subSgstAmt = subTaxableValue * sgstRate / 100 || 0;
-              const subCgstAmt = subTaxableValue * cgstRate / 100 || 0;
-              const subIgstAmt = subTaxableValue * igstRate / 100 || 0;
               totalBeforeTax += subTaxableValue;
-              totalSGST += subSgstAmt;
-              totalCGST += subCgstAmt;
-              totalIGST += subIgstAmt;
+              totalSGST += subTaxableValue * sgstRate / 100 || 0;
+              totalCGST += subTaxableValue * cgstRate / 100 || 0;
+              totalIGST += subTaxableValue * igstRate / 100 || 0;
             });
           }
         });
-
         const grossTotal = totalBeforeTax + totalSGST + totalCGST + totalIGST;
         const roundedTotal = Math.round(grossTotal);
-        const rounding = roundedTotal - grossTotal;
-        const totals = { totalBeforeTax, totalSGST, totalCGST, totalIGST, rounding, roundedTotal };
+        const totals = { totalBeforeTax, totalSGST, totalCGST, totalIGST, rounding: roundedTotal - grossTotal, roundedTotal };
 
         // Generate PDF
         const pdfContainer = document.getElementById('pdf-container');
-        if (!pdfContainer) throw new Error('PDF container element not found in DOM.');
-
-        console.log('Generating PDF HTML for Gmail send');
-        pdfContainer.innerHTML = generateInvoiceHTML(invoiceData, totals);
+        if (!pdfContainer) throw new Error('PDF container element not found.');
+        pdfContainer.innerHTML = generateInvoicePageHTML(invoiceData, items, totals);
         const pdfElement = pdfContainer.querySelector('.invoice-page');
         if (!pdfElement) throw new Error('Failed to generate invoice HTML content.');
 
         // Initialize jsPDF
-        const doc = new jsPDF({
-          orientation: 'portrait',
-          unit: 'mm',
-          format: 'a4'
-        });
-
-        // Capture the content as an image
+        const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
         const canvas = await html2canvas(pdfElement, {
-          scale: isMobileDevice() ? 2 : 3,
+          scale: 2,
           useCORS: true,
           windowWidth: pdfElement.scrollWidth,
           windowHeight: pdfElement.scrollHeight
         });
-
         const imgData = canvas.toDataURL('image/png');
         const pageWidth = 210;
         const pageHeight = 297;
@@ -743,11 +599,8 @@
         const scaledHeight = imgHeight * ratio;
         const xOffset = (pageWidth - scaledWidth) / 2;
         const yOffset = (pageHeight - scaledHeight) / 2;
-
         doc.addImage(imgData, 'PNG', xOffset, yOffset, scaledWidth, scaledHeight);
         const pdfBlob = doc.output('blob');
-
-        // Download PDF
         const blobUrl = URL.createObjectURL(pdfBlob);
         const downloadLink = document.createElement('a');
         downloadLink.href = blobUrl;
@@ -766,14 +619,11 @@
         );
         const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${recipient}&from=${sender}&su=${subject}&body=${body}`;
         window.open(gmailUrl, '_blank');
-        console.log('Gmail compose window opened');
         alert('PDF has been downloaded. Please attach the downloaded PDF in the Gmail compose window and click "Send".');
-
-        // Clean up
         pdfContainer.innerHTML = '';
       } catch (error) {
         console.error('Error in sendInvoiceViaGmail:', error.message);
-        alert(`Failed to generate PDF or open Gmail: ${error.message}. Please try again or manually send the downloaded PDF.`);
+        alert(`Failed to generate PDF or open Gmail: ${error.message}.`);
         const pdfContainer = document.getElementById('pdf-container');
         if (pdfContainer) pdfContainer.innerHTML = '';
       }
@@ -847,45 +697,27 @@
       const filterDay = document.getElementById('filter-day').value;
       const filterMonth = document.getElementById('filter-month').value;
       const filterYear = parseInt(document.getElementById('filter-year').value);
-      let monthlyInvoices = 0;
-      let monthlySubtotal = 0;
-      let monthlyGST = 0;
-      let monthlyEarnings = 0;
-      let monthlyPending = 0;
-      let yearlyInvoices = 0;
-      let yearlySubtotal = 0;
-      let yearlyGST = 0;
-      let yearlyEarnings = 0;
-      let yearlyPending = 0;
+      let monthlyInvoices = 0, monthlySubtotal = 0, monthlyGST = 0, monthlyEarnings = 0, monthlyPending = 0;
+      let yearlyInvoices = 0, yearlySubtotal = 0, yearlyGST = 0, yearlyEarnings = 0, yearlyPending = 0;
       const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
       const selectedMonthName = monthNames[selectedMonth - 1];
       const invoiceListBody = document.getElementById('invoice-list-body');
       invoiceListBody.innerHTML = '';
       try {
-        console.log('Fetching invoices from Firestore');
         const querySnapshot = await getDocs(collection(db, 'invoices'));
         const invoices = [];
         querySnapshot.forEach(doc => {
           const invoiceData = doc.data();
-          console.log('Fetched invoice:', { id: doc.id, ...invoiceData });
           invoices.push({ id: doc.id, ...invoiceData });
         });
-        console.log(`Fetched ${invoices.length} invoices`);
         invoices.forEach(invoice => {
-          if (!invoice || !invoice.date || !Array.isArray(invoice.items)) {
-            console.warn(`Skipping invalid invoice with ID ${invoice.id}:`, invoice);
-            return;
-          }
+          if (!invoice || !invoice.date || !Array.isArray(invoice.items)) return;
           const invoiceDate = new Date(invoice.date);
-          if (isNaN(invoiceDate.getTime())) {
-            console.warn(`Invalid date for invoice ${invoice.id}: ${invoice.date}`);
-            return;
-          }
+          if (isNaN(invoiceDate.getTime())) return;
           const invoiceDay = invoiceDate.getDate();
           const invoiceMonth = invoiceDate.getMonth() + 1;
           const invoiceYear = invoiceDate.getFullYear();
           const invoiceFY = invoiceMonth >= 4 ? `${invoiceYear}-${invoiceYear + 1}` : `${invoiceYear - 1}-${invoiceYear}`;
-          // Apply date filters
           if (filterDay && parseInt(filterDay) !== invoiceDay) return;
           if (filterMonth && parseInt(filterMonth) !== invoiceMonth) return;
           if (filterYear && filterYear !== invoiceYear) return;
@@ -954,18 +786,13 @@
         document.querySelectorAll('.view-btn').forEach(button => {
           button.addEventListener('click', () => {
             const invoiceId = button.getAttribute('data-id');
-            console.log('Navigating to invoice-preview with invoiceId:', invoiceId);
-            if (!invoiceId) {
-              alert('Invoice ID is missing. Cannot navigate to preview.');
-              return;
-            }
             window.location.href = `invoice-preview.html?invoiceId=${invoiceId}`;
           });
         });
         document.querySelectorAll('.print-btn').forEach(button => {
           button.addEventListener('click', () => {
             const invoiceId = button.getAttribute('data-id');
-            downloadInvoicePDF(invoiceId);
+            window.location.href = `invoice-preview.html?invoiceId=${invoiceId}&download=true`;
           });
         });
         document.querySelectorAll('.edit-btn').forEach(button => {
