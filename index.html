@@ -17,7 +17,7 @@
       margin: 0;
       padding: 0;
       font-family: Arial, sans-serif;
-      background-color: #f4f4f4;
+      
     }
     .tabs {
       display: flex;
@@ -44,6 +44,7 @@
       padding: 20px;
       background: white;
       border: 1px solid #ccc;
+      display: block;
     }
     .dashboard-header {
       display: flex;
@@ -314,16 +315,29 @@
       appId: "1:1019077493371:web:2c92f2c902e34b05c358de"
     };
 
+    // Initialize Firebase
+    let app;
     let db;
     try {
-      const app = initializeApp(firebaseConfig);
+      if (typeof initializeApp !== 'function') {
+        throw new Error('Firebase initializeApp function is not available. Ensure the Firebase SDK is loaded correctly.');
+      }
+      app = initializeApp(firebaseConfig);
+      console.log('Firebase app initialized successfully');
       db = getFirestore(app);
-      console.log('Firebase initialized successfully');
+      console.log('Firestore initialized successfully');
     } catch (error) {
       console.error('Error initializing Firebase:', error.message);
-      alert('Failed to initialize Firebase. Please check your configuration and network connection.');
+      alert('Failed to initialize Firebase. Please check your network connection or Firebase configuration.');
       throw error;
     }
+
+    const dashboard = document.getElementById('services');
+    const tabs = document.querySelector('.tabs');
+
+    // Display dashboard by default
+    dashboard.style.display = 'block';
+    tabs.style.display = 'flex';
 
     // Utility: Sanitize HTML to prevent XSS
     function sanitizeHTML(str) {
@@ -877,6 +891,7 @@ Pending: ${document.getElementById('pending-yearly').textContent}
       updateDashboard();
     });
 
+    // Initialize dashboard on page load
     updateDashboard();
   </script>
 </body>
